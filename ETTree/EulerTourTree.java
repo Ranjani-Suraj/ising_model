@@ -19,7 +19,7 @@ class map_edge {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         map_edge other = (map_edge) obj;
-        return this.u == other.u && this.v == other.v;
+        return (this.u == other.u && this.v == other.v) || (this.u == other.v && this.v == other.u);
     }
     @Override
     public String toString() {
@@ -29,16 +29,24 @@ class map_edge {
 
 
 public class EulerTourTree {
-    ArrayList<TreapNode> forest;
+    public ArrayList<TreapNode> forest;
     Map<map_edge, TreapNode[]> edges = new HashMap<>();  //edge to its treap nodes. So that when we cut, we know what to cut
-    Map<Integer, java.util.ArrayList<TreapNode>> nodes = new HashMap<>();  //node u to its treap nodes, where u->x, so that when adding we know where to connect
+    public Map<Integer, java.util.ArrayList<TreapNode>> nodes = new HashMap<>();  //node u to its treap nodes, where u->x, so that when adding we know where to connect
 
     // idea: We have some edges in our graph. They are not necessarily connected. 
     // We maintain a forest of Euler Tour Trees, one for each connected component.
     // Each Euler Tour Tree is represented as a Treap.
     // Each ETT is going to have a level
 
-   
+    public TreapNode getNode(int u, int v) {
+        TreapNode[] edge_nodes = edges.get(new map_edge(u, v));
+        if (edge_nodes == null) return null;
+        if (edge_nodes[0].key.from == u && edge_nodes[0].key.to == v) {
+            return edge_nodes[0];
+        }
+        return edge_nodes[1];
+    }
+
     public EulerTourTree() {
         forest = new ArrayList<>();
         edges = new HashMap<>();
@@ -73,8 +81,6 @@ public class EulerTourTree {
             rootU = Treap.reroot(rootU); //reroot at some node of u before adding it to nodes
             rootV = Treap.reroot(rootV); //reroot at some node of v before adding it to nodes
             //if both exist, we put u->v at the end of the treap of rootU, and v->u at the end of the treap of rootV
-            
-
         }
         else if (rootU != null) {
             forest.remove(Treap.root(rootU));
@@ -107,24 +113,45 @@ public class EulerTourTree {
         System.out.println("----------------------------");
         forest.add(Treap.root(root));
         System.out.println("is_valid(): " + is_valid()); 
-        return;
+        
     }
 
+    void printEdges() {
+        for (map_edge e : edges.keySet()) {
+            System.out.println("map edge" + e + " has treap nodes: " + edges.get(e)[0].key + " and " + edges.get(e)[1].key);
+            System.out.println(e + ": " + edges.get(e)[0].key + " and " + edges.get(e)[1].key);
 
+        }
+    }
 
     public TreapNode[] cut(int u, int v) {
-        if (!connected(u, v)) return null;
-
+        if (!connected(u, v)) 
+            return null;
+        // if (!edges.containsKey(new map_edge(v, u))) {
+        //     System.out.println("Edge " + u + "-" + v + " does not exist.");
+        // }
         //now to cut edge u-v
-        TreapNode[] edgeNodes = edges.getOrDefault(new map_edge(u, v), null);
+        TreapNode[] edgeNodes = edges.get(new map_edge(v, u));
+        map_edge e = new map_edge(u, v);
+         if (edgeNodes == null){
+            e = new map_edge(v, u);
+            edgeNodes = edges.get(e);
+        }
+        
+        
+        System.out.println("Edgenodes "+ edgeNodes);
+        System.out.println("edges in the graph: ");
+        printEdges();
+
         if (edgeNodes == null) {
             return null;
-        }
+        } 
+        
         TreapNode orig_root = Treap.root(edgeNodes[0]);
         forest.remove(orig_root);
         int i = Math.min(Treap.getIndex(edgeNodes[0]), Treap.getIndex(edgeNodes[1]));
-        TreapNode minnode = (Treap.getIndex(edgeNodes[0]) < Treap.getIndex(edgeNodes[1])) ? edgeNodes[0] : edgeNodes[1];
-        System.out.println("minnode to reroot at: " + minnode.key);
+        // TreapNode minnode = (Treap.getIndex(edgeNodes[0]) < Treap.getIndex(edgeNodes[1])) ? edgeNodes[0] : edgeNodes[1];
+        // System.out.println("minnode to reroot at: " + minnode.key);
         int j = Math.max(Treap.getIndex(edgeNodes[0]), Treap.getIndex(edgeNodes[1]));
         TreapNode root = Treap.root(edgeNodes[0]);
         TreapNode[] split1 = Treap.split(root, i);
@@ -150,25 +177,45 @@ public class EulerTourTree {
         System.out.println("im trying something");
         Treap.inorder(cutroot);
         System.out.println("-------");
+        TreapNode edge = Treap.root(cutroot);
         cutroot = Treap.delete_root_and_leaf(cutroot);
         Treap.inorder(cutroot);
         System.out.println("-------");
         //cleaning up
         nodes.get(u).remove(edgeNodes[0]);
         nodes.get(v).remove(edgeNodes[1]);
-        edges.remove(new map_edge(u, v));
+        edges.remove(e);
         System.out.println("edges remaining after cut:"+edges.size());
+        // if cutroot is empty, then we have made some node an individual node. We can make that node into a treap of size 1 with a self loop
+        if (cutroot != null)
+            forest.add(cutroot);
+        if (cutroot == null){
+            if (nodes.get(u).isEmpty()) {
+                cutroot = new TreapNode(u, u); 
+            }
+            else if (nodes.get(v).isEmpty()) {
+                cutroot = new TreapNode(v, v); 
+            }
+        }
         if (nodes.get(u).isEmpty()) {
             nodes.remove(u);
         }
         if (nodes.get(v).isEmpty()) {
             nodes.remove(v);
         }
-        
+       
         forest.add(root);
-        forest.add(cutroot);
+        
         System.out.println("Remaining forest after cut:");
-        System.out.println("is_valid(): " + is_valid()); 
+        boolean valid = is_valid();
+        System.out.println("is_valid(): " + valid); 
+        if (!valid){
+            System.out.println("Forest is not valid after cut. Printing forest:");
+            printForest();
+            System.out.println("Edges in the graph:");
+            printEdges();
+            System.out.println("-----------");
+        }
         // /printForest();
         return new TreapNode[]{root, cutroot};
     }

@@ -24,11 +24,13 @@ import java.util.Random;
 
 public class TreapNode {
     int id;        // Euler tour edge (u → v)
-    TreapKey key;
+    public TreapKey key;
     int priority;
     int size;
     public static Random random = new Random();
-    TreapNode left, right, parent;
+    public TreapNode left;
+    public TreapNode right;
+    TreapNode parent;
 
     public TreapNode(int from, int to) {
         this.key = new TreapKey(from, to);
@@ -58,7 +60,7 @@ public class TreapNode {
 //     }
     
 
-    static int size(TreapNode t) {
+    public static int size(TreapNode t) {
         return t == null ? 0 : t.size;
     }
 

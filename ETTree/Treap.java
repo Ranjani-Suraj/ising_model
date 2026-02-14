@@ -78,6 +78,16 @@ public class Treap
         }
     }
 
+    public static boolean contains(TreapNode root, int x){
+         if (root == null) return false;
+        if (root.key.from == x || root.key.to == x) return true;
+        if (x < root.key.from) {
+            return contains(root.left, x);
+        } else {
+            return contains(root.right, x);
+        }
+    }
+
     public static ArrayList<TreapNode> inorderToList(TreapNode root, ArrayList<TreapNode> list) {
         if (root == null) 
             return list;

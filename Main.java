@@ -1,4 +1,4 @@
-import ETTree.EulerTourTree;
+import DynGraph.ConnGraph;
 import ETTree.Treap;
 import ETTree.TreapNode;
 import java.util.HashMap;
@@ -35,24 +35,31 @@ public class Main {
     }
 
     static void from_ett(){
-        EulerTourTree ett = new EulerTourTree();
-        ett.link(1, 2);
-        ett.link(2, 3);
-        ett.link(3, 4);
-        ett.link(4, 5);
+        ConnGraph g = new ConnGraph();
+        g.addEdge(1, 2);
+        g.addEdge(2, 3);
+        g.addEdge(3, 4);
+        g.addEdge(4, 5);
+        // g.addEdge(1, 4);
         System.out.println("After linking edges (1,2), (2,3), (3,4), (4,5):");
-        ett.printForest();
+        g.printForest();
         System.out.println("----------------------------");
 
-        ett.cut(2, 3);
+        g.deleteEdge(2, 3);
         System.out.println("After cutting edge (2,3):");
-        ett.printForest();
+        g.printForest();
         System.out.println("----------------------------");
 
-        ett.link(1, 3);
+        g.addEdge(1, 3);
         System.out.println("After linking edge (1,3):");
-        ett.printForest();
+        g.printForest();
         System.out.println("----------------------------");
+        g.addEdge(2, 3);
+        System.out.println("After linking edge (2,3):");
+        g.printForest();
+        g.deleteEdge(1, 2);
+        System.out.println("After cutting edge (2,1):");
+        g.printForest();
     }
 
     void from_treap(){

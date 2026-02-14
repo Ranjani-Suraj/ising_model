@@ -1,9 +1,10 @@
 package ETTree;
 
 public class TreapKey implements Comparable<TreapKey> {
-    int from, to;
+    public int from;
+    public int to;
     int index;
-    TreapKey(int from, int to) {
+    public TreapKey(int from, int to) {
         this.from = from;
         this.to = to;
         index = -1;
