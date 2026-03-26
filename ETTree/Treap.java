@@ -28,13 +28,20 @@ public class Treap
         TreapNode x = y.left;
         TreapNode T2 = x.right;
 
-        // Perform rotation
         x.right = y;
         y.left = T2;
 
-        // Return new root
+        if (T2 != null) T2.parent = y;
+
+        x.parent = y.parent;
+        y.parent = x;
+
+        update(y);
+        update(x);
+
         return x;
     }
+
 
     // A utility function to left rotate subtree rooted with x
 // See the diagram given above.
@@ -42,13 +49,20 @@ public class Treap
         TreapNode y = x.right;
         TreapNode T2 = y.left;
 
-        // Perform rotation
         y.left = x;
         x.right = T2;
 
-        // Return new root
+        if (T2 != null) T2.parent = x;
+
+        y.parent = x.parent;
+        x.parent = y;
+
+        update(x);
+        update(y);
+
         return y;
     }
+
 
     public static int size(TreapNode node) {
         return (node == null) ? 0 : node.size;
@@ -77,7 +91,7 @@ public class Treap
             return contains(root.right, key);
         }
     }
-
+ 
     public static boolean contains(TreapNode root, int x){
          if (root == null) return false;
         if (root.key.from == x || root.key.to == x) return true;
@@ -195,25 +209,45 @@ public class Treap
 
         if (TreapNode.size(t.left) >= k) {
             TreapNode[] leftSplit = split(t.left, k);
+
             t.left = leftSplit[1];
+            if (t.left != null) t.left.parent = t;
+
             update(t);
 
             if (leftSplit[0] != null) leftSplit[0].parent = null;
-            t.parent = null;
 
             return new TreapNode[]{leftSplit[0], t};
         } else {
             TreapNode[] rightSplit =
                 split(t.right, k - TreapNode.size(t.left) - 1);
+
             t.right = rightSplit[0];
+            if (t.right != null) t.right.parent = t;
+
             update(t);
 
             if (rightSplit[1] != null) rightSplit[1].parent = null;
-            t.parent = null;
 
             return new TreapNode[]{t, rightSplit[1]};
         }
     }
+
+    public static TreapNode[] peekSplit(TreapNode t, int k) {  //simulates teh result of a split without actually changing anything in the treap
+        if (t == null) {
+            return new TreapNode[]{null, null};
+        }
+
+        if (TreapNode.size(t.left) >= k) {
+            TreapNode[] leftSplit = peekSplit(t.left, k);
+            return new TreapNode[]{leftSplit[0], t};
+        } else {
+            TreapNode[] rightSplit =
+                peekSplit(t.right, k - TreapNode.size(t.left) - 1);
+            return new TreapNode[]{t, rightSplit[1]};
+        }
+    }
+
 
     
     // Java function to search a given key in a given BST
@@ -231,7 +265,7 @@ public class Treap
     //     return search(root.left, key);
     // }
     public static void inorder(TreapNode root)
-    {
+    {   if (root == null) return;
         if (root != null)
         {
             if (root.left != null)
@@ -247,5 +281,24 @@ public class Treap
         }
     }
 
+    public static TreapNode peekMerge(TreapNode a, TreapNode b) {
+        // reroot(a);
+        // reroot(b);
+        TreapNode merged = peekMerge_(a, b);
+        return merged;
+    }
+
+    public static TreapNode peekMerge_(TreapNode a, TreapNode b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        
+        if (a.priority > b.priority) {
+            a.right = peekMerge_(a.right, b);
+            return a;
+        } else {
+            b.left = peekMerge_(a, b.left);
+            return b;
+        }
+    }
     
 }
