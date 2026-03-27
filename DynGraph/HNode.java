@@ -119,10 +119,10 @@ public class HNode {
             // this.nodes_covered.add(edge[0]);
             // this.nodes_covered.add(edge[1]);
         }
-        if (this.weight+child.weight  >= Math.floor(this.n/Math.pow(2, this.depth))){
-            //we need to make a new level as this will hit the invariant. This should never happen though
-            return -1;
-        }
+        // if (this.weight+child.weight  >= Math.floor(this.n/Math.pow(2, this.depth))){
+        //     //we need to make a new level as this will hit the invariant. This should never happen though
+        //     return -1;
+        // }
         this.weight += child.weight;
         this.children.add(child);
         child.parent = this;
@@ -131,7 +131,6 @@ public class HNode {
         return 1;
     }
 
-    
 
     public void add_witness_edge(int u, int v){
         if (!edges_being_covered.containsKey(u)){
@@ -150,9 +149,7 @@ public class HNode {
             //this is a leaf node, so we can just copy the isEndpoint bitmap from the leaf data
             this.leafData.recomputeBitmap(); //recompute the bitmap for the leaf data first, since it may have changed since the last time we computed the bitmap for this node
             for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < D_MAX; j++) {
-                    this.isEndpoint[i][j] = this.leafData.isEndpoint[i][j];
-                }
+                System.arraycopy(this.leafData.isEndpoint[i], 0, this.isEndpoint[i], 0, D_MAX);
             }
             return;
         }

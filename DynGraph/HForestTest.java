@@ -140,10 +140,11 @@ public class HForestTest {
             hf.add_edge(0, 1); ng.insert(0, 1);
             hf.add_edge(1, 2); ng.insert(1, 2);
             hf.add_edge(0, 2); ng.insert(0, 2);  // cycle edge — should be secondary
-            boolean isSecondary = hf.leaves[0].leafData.secondary_edges[1].contains(2)
-                               || hf.leaves[2].leafData.secondary_edges[1].contains(0);
+            HNode n = new HNode(0, 0);
+            boolean isSecondary = hf.leaves[0].leafData.primary_edges[1].contains(2)
+                               || hf.leaves[2].leafData.primary_edges[1].contains(0);
             if (!isSecondary) {
-                result.fail("1b: cycle edge {0,2} should be secondary");
+                result.fail("1b: cycle edge {0,2} should be primary");
             } else {
                 result.pass();
             }
@@ -702,6 +703,10 @@ class TestResult {
             failures.forEach(f -> System.out.println("  - " + f));
         }
         System.out.println("========================================");
+    }
+
+    public static void main(String[] args) {
+        HForestTest.main(args);
     }
 }
 

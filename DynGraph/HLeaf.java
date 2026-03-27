@@ -17,6 +17,7 @@ public class HLeaf {
     public HashSet<Integer> secondary_edges[]; // secondary_edges.get(i) = set of neighbours this vertex has at depth i that are secondary edges
     public int d_max; // d_max
     public int vertex; // the vertex that this leaf corresponds to
+    public int depth_of_node; // the depth of the node that this leaf corresponds to
     public HLeaf(int vertex, int dMax, HNode node) {
         this.node = node;
         this.vertex = vertex;
@@ -35,6 +36,7 @@ public class HLeaf {
             secondary_edges[i] = new HashSet<Integer>();
         }
         //this.depth = dMax;
+        this.depth_of_node = node.depth;
     }
 
     public void add_edge_info(int v, int depth, EndpointType type){

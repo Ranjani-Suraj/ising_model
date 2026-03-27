@@ -1,6 +1,6 @@
 import Cftp.CouplingPast;
 import DynGraph.ConnGraph;
-import DynGraph.HForest;
+import DynGraph.HForestTest;
 import ETTree.Treap;
 import ETTree.TreapNode;
 import java.util.ArrayList;
@@ -35,12 +35,13 @@ public class Main {
     
     public static void main(String[] args)
     {
-        HForest hf = new HForest(5);
-        hf.add_edge(1, 2);
-        hf.add_edge(2, 3);
-        hf.add_edge(3, 4);
-        hf.add_edge(4, 5);
-        hf.drawHForest();
+        // HForest hf = new HForest(5);
+        // hf.add_edge(1, 2);
+        // hf.add_edge(2, 3);
+        // hf.add_edge(3, 4);
+        // hf.add_edge(4, 5);
+        // hf.drawHForest();
+        HForestTest hft = new HForestTest();
 
     }
 

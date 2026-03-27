@@ -93,8 +93,9 @@ public class HForest {
     }
 
     // ---------------------------------------------------------------
-    // Leaves exist at level 0. Everything build up from the leaves. 
-    // Insert edges at level 1, and promote them as necessary, but every edge starts at depth 1?
+    // Leaves start off at level dmax. when we add an edge w that vertex, we set the leaf depth to 1, and the leaf depth
+    // will increase as we merge components and promote edges, but the leaf depth will always be the depth of the node that the leaf is in.
+    // alternatively, we could just have it such that the leaf depth is always dmax, and we are just not storing the path from root - leaf. This would be more in line with hte paper
     // ---------------------------------------------------------------
     public void add_edge(int u, int v) {
         if (getEdgeType(u, v) != null) {
@@ -109,23 +110,32 @@ public class HForest {
             HNode rootU = getRoot(leaves[u]);
             HNode rootV = getRoot(leaves[v]);
             //if the roots are themselves, then they are still leaves. We always add an edge at level 1, so we would need to promote the leaf to level 2, and then merge the two level 2 nodes.
-            if (rootU.leafData != null){
-                rootU.depth = 2;
-                rootU.isRoot = false;
-                rootU.children.add(rootU); //circular pointers
-            }
-            if (rootV.leafData != null){
-                rootV.depth = 2;
-                rootV.isRoot = false;
-                rootV.children.add(rootV);
-            }
             
-            mergeRoots(rootU, rootV);
+            if (rootU == leaves[u]) { //we are adding this vertex for the first time, 
+                rootU.depth = 1;
+                rootU.leafData.depth_of_node = 1; 
+                rootU.weight = 1;
+            }
+            if(rootV == leaves[v]) { //we are adding this vertex for the first time, 
+                rootV.depth = 1;
+                rootV.leafData.depth_of_node = 1; 
+                rootV.weight = 1;
+            }
+            //the difference when adding leaves versus adding existing subtrees when adding subtrees we can just merge the roots
+            //when adding leaves, the leaf IS the root so we need the new root to have the leaves as children
+            
+            HNode newroot = mergeRoots(rootU, rootV);
+            if (rootU == leaves[u]) {
+                leaves[u].parent = newroot;
+                newroot.children.add(leaves[u]);
+            }
+            if (rootV == leaves[v]) {
+                leaves[v].parent = newroot;
+                newroot.children.add(leaves[v]);
+            }
         }
 
-        // Register at both leaves
-        // Line 97 — passes u to itself instead of v as neighbor
-        // Should be
+        // Register at both leaves 
         leaves[u].leafData.add_edge_info(v, 1, rec.type);  // u's leaf records neighbor v
         leaves[v].leafData.add_edge_info(u, 1, rec.type);  // v's leaf records neighbor u
         
@@ -187,12 +197,14 @@ public class HForest {
         delete_edge_at_depth(u, v, depth);
     }
 
+    //lower levels contain information about higher levels. The whole invariant is that  G_i \subset G_(i-1)
+    //if there are gaps, we can jsut take something at a level that is lower than the desired level
     public HNode getNodeAtDepth(HLeaf leafu, int depth){
         HNode current = leafu.node;
-        while (current.depth < depth){
+        while (current.depth > depth){
             current = current.parent;
         }
-        if (current.depth == depth){
+        if (current.depth <= depth){
             return current;
         }
         return null;
@@ -544,7 +556,7 @@ public class HForest {
             if(!current.isEndpoint[0][depth]) continue;
             //we want to add the HNode that corresponds to this leaf to the component, which is the leaf node itself if the depth of the leaf is equal to the depth we are looking at, otherwise it is the parent node of the leaf node at the depth we are looking at
             HNode parent = current_node.parent;
-            while (parent != null && parent.depth > depth) parent = parent.parent;
+            while (parent != null && parent.depth < depth) parent = parent.parent;
             if (parent != null && parent.depth == depth){
                 componentNodes.add(parent);    
             }
