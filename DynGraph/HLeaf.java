@@ -2,9 +2,6 @@ package DynGraph;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-enum EndpointType {
-    WITNESS, PRIMARY, SECONDARY
-}
 
 public class HLeaf {
     public boolean[][] isEndpoint;
@@ -94,10 +91,14 @@ public class HLeaf {
     public void promote_primary_edge(int v, int depth){
         remove_primary_edge(v, depth);
         add_edge_info(v, depth + 1, EndpointType.PRIMARY);
+        recomputeBitmap();
+        node.recomputeBitmapsUp();
     }
     public void promote_witness_edge(int v, int depth){
         remove_witness_edge(v, depth);
         add_edge_info(v, depth + 1, EndpointType.WITNESS); 
+        recomputeBitmap();
+        node.recomputeBitmapsUp();
     }
 
 

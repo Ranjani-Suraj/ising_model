@@ -2,9 +2,7 @@ package DynGraph;
 
 import java.util.*;
 
-enum EndpointType {
-    WITNESS, PRIMARY, SECONDARY
-}
+
 // =============================================================================
 // MAIN TEST CLASS
 // =============================================================================
@@ -39,6 +37,7 @@ public class HForestTest {
         if (hfConn != ngConn) {
             result.fail(context + " — connected(" + u + "," + v + "): "
                         + "HForest=" + hfConn + " expected=" + ngConn);
+            printForestState(hf);
         } else {
             result.pass();
         }
@@ -87,6 +86,7 @@ public class HForestTest {
         if (actual != expected) {
             result.fail(context + " — root count: HForest=" + actual
                         + " expected=" + expected);
+            
         } else {
             result.pass();
         }
@@ -103,6 +103,7 @@ public class HForestTest {
                 result.fail(context + " — leaf " + vertex
                             + " isEndpoint[WITNESS][" + d + "]=" + wBit
                             + " but witness_edges[" + d + "].isEmpty()=" + leaf.witness_edges[d].isEmpty());
+                printForestState(hf);
                 return;
             }
             boolean pBit = leaf.isEndpoint[1][d];
@@ -111,10 +112,29 @@ public class HForestTest {
                 result.fail(context + " — leaf " + vertex
                             + " isEndpoint[PRIMARY][" + d + "]=" + pBit
                             + " but primary_edges[" + d + "].isEmpty()=" + leaf.primary_edges[d].isEmpty());
+                printForestState(hf);
                 return;
             }
         }
         result.pass();
+    }
+
+    static void testLevels(TestResult result) {
+        HForest hf = new HForest(4);
+        hf.add_edge(0, 1);
+        hf.add_edge(1, 2);
+        hf.add_edge(2, 3);
+        // This should create a chain of witnesses at increasing depths
+        for (int d = 1; d < hf.dMax; d++) {
+            assertLeafNeighbors(hf, 0, d, EndpointType.WITNESS,
+                                Set.of(1), "testLevels leaf 0 depth " + d, result);
+            assertLeafNeighbors(hf, 1, d, EndpointType.WITNESS,
+                                Set.of(0, 2), "testLevels leaf 1 depth " + d, result);
+            assertLeafNeighbors(hf, 2, d, EndpointType.WITNESS,
+                                Set.of(1, 3), "testLevels leaf 2 depth " + d, result);
+            assertLeafNeighbors(hf, 3, d, EndpointType.WITNESS,
+                                Set.of(2), "testLevels leaf 3 depth " + d, result);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -127,10 +147,12 @@ public class HForestTest {
         {
             HForest hf = new HForest(4);
             NaiveGraph ng = new NaiveGraph(4);
-            hf.add_edge(0, 1); ng.insert(0, 1);
+            hf.add_edge(0, 1); 
+            ng.insert(0, 1);
             assertPair(hf, ng, 0, 1, "1a: insert(0,1) connected", result);
             assertPair(hf, ng, 0, 2, "1a: insert(0,1) unrelated pair", result);
             assertWitnessSymmetry(hf, 0, 1, 1, "1a: witness symmetry", result);
+            printForestState(hf);
         }
 
         // 1b: edge within same component is secondary, not witness
@@ -140,14 +162,16 @@ public class HForestTest {
             hf.add_edge(0, 1); ng.insert(0, 1);
             hf.add_edge(1, 2); ng.insert(1, 2);
             hf.add_edge(0, 2); ng.insert(0, 2);  // cycle edge — should be secondary
-            HNode n = new HNode(0, 0);
+            // HNode n = new HNode(0, 0);
             boolean isSecondary = hf.leaves[0].leafData.primary_edges[1].contains(2)
                                || hf.leaves[2].leafData.primary_edges[1].contains(0);
             if (!isSecondary) {
                 result.fail("1b: cycle edge {0,2} should be primary");
+                printForestState(hf);
             } else {
                 result.pass();
             }
+            printForestState(hf);
         }
 
         // 1c: chain inserts — all pairs in chain connected
@@ -219,6 +243,7 @@ public class HForestTest {
                             || hf.leaves[2].leafData.secondary_edges[1].contains(0);
             if (stillHas) {
                 result.fail("2b: secondary edge still in leaf after delete");
+                printForestState(hf);
             } else {
                 result.pass();
             }
@@ -266,6 +291,7 @@ public class HForestTest {
             hf.add_edge(3, 0); ng.insert(3, 0); // closes cycle
             hf.delete_edge(0, 1); ng.delete(0, 1);
             assertConnectivity(hf, ng, 4, "3b: 4-cycle delete", result);
+            assertRootCount(hf, ng, "3b: 4-cycle root count", result);
         }
 
         // 3c: multiple cycles — delete witness, correct replacement chosen
@@ -280,8 +306,10 @@ public class HForestTest {
                 }
             // Delete some witness edges
             hf.delete_edge(0, 1); ng.delete(0, 1);
+            printForestState(hf);
             hf.delete_edge(0, 2); ng.delete(0, 2);
             assertConnectivity(hf, ng, n, "3c: complete graph partial delete", result);
+            assertRootCount(hf, ng, "3c: complete graph root count", result);
         }
     }
 
@@ -296,6 +324,7 @@ public class HForestTest {
             HForest hf = new HForest(3);
             NaiveGraph ng = new NaiveGraph(3);
             hf.add_edge(0, 1); ng.insert(0, 1);
+            printForestState(hf);
             hf.delete_edge(0, 1); ng.delete(0, 1);
             assertPair(hf, ng, 0, 1, "4a: single edge delete", result);
             assertRootCount(hf, ng, "4a: root count after disconnect", result);
@@ -322,6 +351,7 @@ public class HForestTest {
             hf.add_edge(2, 3); ng.insert(2, 3);
             hf.delete_edge(0, 1); ng.delete(0, 1);
             assertConnectivity(hf, ng, 4, "4c: path end delete", result);
+            assertRootCount(hf, ng, "4c: path root count", result);
         }
 
         // 4d: star — remove all edges, n components
@@ -398,9 +428,11 @@ public class HForestTest {
                          || hf.leaves[0].leafData.secondary_edges[1].contains(1);
             boolean vHasU = hf.leaves[1].leafData.witness_edges[1].contains(0)
                          || hf.leaves[1].leafData.secondary_edges[1].contains(0);
-            if (!uHasV) result.fail("6a: leaf 0 doesn't reference vertex 1");
+            if (!uHasV) 
+                {result.fail("6a: leaf 0 doesn't reference vertex 1"); printForestState(hf);}
             else result.pass();
-            if (!vHasU) result.fail("6a: leaf 1 doesn't reference vertex 0");
+            if (!vHasU) 
+                {result.fail("6a: leaf 1 doesn't reference vertex 0"); printForestState(hf);}
             else result.pass();
         }
 
@@ -419,9 +451,11 @@ public class HForestTest {
                        || hf.leaves[1].leafData.primary_edges[d].contains(0)
                        || hf.leaves[1].leafData.secondary_edges[d].contains(0);
             }
-            if (uHasV) result.fail("6b: leaf 0 still references 1 after delete");
+            if (uHasV) 
+                {result.fail("6b: leaf 0 still references 1 after delete"); printForestState(hf);}
             else result.pass();
-            if (vHasU) result.fail("6b: leaf 1 still references 0 after delete");
+            if (vHasU) 
+                {result.fail("6b: leaf 1 still references 0 after delete"); printForestState(hf);}
             else result.pass();
         }
 
@@ -446,7 +480,7 @@ public class HForestTest {
         Random rng = new Random(42); // fixed seed for reproducibility
         int n = 8;
         int rounds = 3;
-        int opsPerRound = 30;
+        int opsPerRound = 90;
 
         for (int round = 0; round < rounds; round++) {
             HForest hf = new HForest(n);
@@ -483,10 +517,13 @@ public class HForestTest {
                     hf.delete_edge(u, v);
                     ng.delete(u, v);
                     currentEdges.remove(chosen);
-
+                    //failed round 0 operation 29
                     assertConnectivity(hf, ng, n,
                         "stress round=" + round + " op=" + op
                         + " delete(" + u + "," + v + ")", result);
+                    assertBitmapConsistency(hf, v, chosen, result);
+                    assertRootCount(hf, ng, chosen, result);
+                    //assertWitnessSymmetry(hf, u, v, op, chosen, result);
                 }
             }
 
@@ -591,6 +628,304 @@ public class HForestTest {
         System.out.println("===================");
     }
 
+    
+    // public static HForest buildForestForTest(){
+    //     HForest forest = new HForest(16);
+        
+    //     forest.add_edge(1, 2);
+    //     forest.add_edge(2, 3);
+    //     forest.add_edge(3, 5);
+    //     forest.add_edge(4, 5);
+    //     forest.add_edge(6, 5);
+    //     forest.add_edge(6, 7);
+    //     forest.add_edge(3, 4);
+    //     forest.add_edge(1, 6);
+    //     forest.add_edge(1, 7);
+    //     forest.add_edge(8, 9);
+    //     forest.add_edge(11, 12);
+    //     forest.add_edge(8, 13);
+    //     forest.add_edge(13, 10);
+    //     forest.add_edge(11, 9);
+    //     forest.add_edge(11, 12);
+    //     forest.add_edge(13, 14);
+    //     forest.add_edge(14, 15);
+    //     forest.add_edge(12, 15);
+    //     forest.add_edge(5, 8);
+    //     forest.add_edge(6, 9);
+    //     //----
+    //     forest.leaves[1].leafData.promote_witness_edge(2, 1);
+    //     forest.leaves[1].leafData.promote_witness_edge(2, 2);
+    //     //--
+    //     forest.leaves[2].leafData.promote_witness_edge(3, 1);
+    //     //---
+    //     forest.leaves[3].leafData.promote_witness_edge(5, 1);
+    //     forest.leaves[5].leafData.promote_witness_edge(6, 1);
+    //     //--
+    //     forest.leaves[6].leafData.promote_witness_edge(7, 1);
+    //     forest.leaves[6].leafData.promote_witness_edge(7, 2);
+    //     //--
+    //     forest.leaves[8].leafData.promote_witness_edge(9, 1);
+    //     forest.leaves[8].leafData.promote_witness_edge(9, 2);
+    //     //
+    //     forest.leaves[8].leafData.promote_witness_edge(13, 1);
+    //     forest.leaves[13].leafData.promote_witness_edge(10, 1);
+    //     forest.leaves[9].leafData.promote_witness_edge(11, 1);
+    //     //
+    //     forest.leaves[11].leafData.promote_witness_edge(12, 1);
+    //     forest.leaves[11].leafData.promote_witness_edge(12, 2);
+    //     forest.leaves[15].leafData.promote_witness_edge(14, 1);
+    //     forest.leaves[15].leafData.promote_witness_edge(14, 2);
+    //     //Now for the other directions of ALL OF THESE
+    //     forest.leaves[2].leafData.promote_witness_edge(1, 1);
+    //     forest.leaves[2].leafData.promote_witness_edge(1, 2);
+    //     //--
+    //     forest.leaves[3].leafData.promote_witness_edge(2, 1);
+    //     //---
+    //     forest.leaves[5].leafData.promote_witness_edge(3, 1);
+    //     forest.leaves[6].leafData.promote_witness_edge(5, 1);
+    //     //--
+    //     forest.leaves[7].leafData.promote_witness_edge(6, 1);
+    //     forest.leaves[7].leafData.promote_witness_edge(6, 2);
+    //     //--
+    //     forest.leaves[9].leafData.promote_witness_edge(8, 1);
+    //     forest.leaves[9].leafData.promote_witness_edge(8, 2);
+    //     //
+    //     forest.leaves[13].leafData.promote_witness_edge(8, 1);
+    //     forest.leaves[10].leafData.promote_witness_edge(13, 1);
+    //     forest.leaves[11].leafData.promote_witness_edge(9, 1);
+    //     //
+    //     forest.leaves[12].leafData.promote_witness_edge(11, 1);
+    //     forest.leaves[12].leafData.promote_witness_edge(11, 2);
+    //     forest.leaves[14].leafData.promote_witness_edge(15, 1);
+    //     forest.leaves[14].leafData.promote_witness_edge(15, 2);
+    //     //////
+    //     /// Now for primary edges
+    //     /// 
+    //     forest.leaves[3].leafData.promote_primary_edge(4, 1);
+    //     forest.leaves[4].leafData.promote_primary_edge(3, 1);
+    //     forest.leaves[10].leafData.promote_primary_edge(12, 1);
+    //     forest.leaves[12].leafData.promote_primary_edge(10, 1);
+    //     ///
+    //     /// Now to create the node representations
+    //     /// 
+    //     HNode _1_2 = new HNode(16, 3);
+    //     forest.leaves[1].leafData.node = _1_2;
+    //     forest.leaves[2].leafData.node = _1_2;
+    //     _1_2.children.add(forest.leaves[1]);
+    //     _1_2.children.add(forest.leaves[2]);
+    //     forest.leaves[1].parent = _1_2;
+    //     forest.leaves[2].parent = _1_2;
+    //     HNode _3 = new HNode(16, 3);
+    //     forest.leaves[3].leafData.node = _3;
+    //     _3.children.add(forest.leaves[3]);
+    //     forest.leaves[3].parent = _3;
+    //     HNode _4_5 = new HNode(16, 3);
+    //     forest.leaves[4].leafData.node = _4_5;
+    //     _4_5.children.add(forest.leaves[4]);
+    //     forest.leaves[4].parent = _4_5;
+    //     forest.leaves[5].leafData.node = _4_5;
+    //     _4_5.children.add(forest.leaves[5]);
+    //     forest.leaves[5].parent = _4_5;
+    //     HNode _6_7 = new HNode(16, 3);
+    //     forest.leaves[6].leafData.node = _6_7;
+    //     _6_7.children.add(forest.leaves[6]);
+    //     forest.leaves[6].parent = _6_7;
+    //     forest.leaves[7].leafData.node = _6_7;
+    //     _6_7.children.add(forest.leaves[7]);
+    //     forest.leaves[7].parent = _6_7;
+    //     HNode _8_9 = new HNode(16, 3);
+    //     /////
+    //     forest.leaves[8].leafData.node = _8_9;
+    //     _8_9.children.add(forest.leaves[8]);
+    //     forest.leaves[8].parent = _8_9;
+    //     forest.leaves[9].leafData.node = _8_9;
+    //     _8_9.children.add(forest.leaves[9]);
+    //     forest.leaves[9].parent = _8_9;
+    //     HNode _10 = new HNode(16, 3);
+    //     forest.leaves[10].leafData.node = _10;
+    //     _10.children.add(forest.leaves[10]);
+    //     forest.leaves[10].parent = _10;
+    //     HNode _11_12 = new HNode(16, 3);
+    //     forest.leaves[11].leafData.node = _11_12;
+    //     _11_12.children.add(forest.leaves[11]);
+    //     forest.leaves[11].parent = _11_12;
+    //     forest.leaves[12].leafData.node = _11_12;
+    //     _11_12.children.add(forest.leaves[12]);
+    //     forest.leaves[12].parent = _11_12;
+    //     HNode _13 = new HNode(16, 3);
+    //     forest.leaves[13].leafData.node = _13;
+    //     _13.children.add(forest.leaves[13]);
+    //     forest.leaves[13].parent = _13;
+    //     ///
+    //     HNode _14_15 = new HNode(16, 3);
+    //     forest.leaves[14].leafData.node = _14_15;
+    //     _14_15.children.add(forest.leaves[14]);
+    //     forest.leaves[14].parent = _14_15;
+    //     forest.leaves[15].leafData.node = _14_15;
+    //     _14_15.children.add(forest.leaves[15]);
+    //     forest.leaves[15].parent = _14_15;
+    //     ///Now for level 2 nodes
+    //     HNode _1_2_3_4_5_6_7 = new HNode(16, 2);
+    //     _1_2_3_4_5_6_7.children.add(_1_2);
+    //     _1_2.parent = _1_2_3_4_5_6_7;
+    //     _1_2_3_4_5_6_7.children.add(_3);
+    //     _3.parent = _1_2_3_4_5_6_7;
+    //     _1_2_3_4_5_6_7.children.add(_4_5);
+    //     _4_5.parent = _1_2_3_4_5_6_7;
+    //     _1_2_3_4_5_6_7.children.add(_6_7);
+    //     _6_7.parent = _1_2_3_4_5_6_7;
+    //     HNode _8_9_10_11_12_13 = new HNode(16, 2);
+    //     _8_9_10_11_12_13.children.add(_8_9);
+    //     _8_9.parent = _8_9_10_11_12_13;
+    //     _8_9_10_11_12_13.children.add(_10); 
+    //     _10.parent = _8_9_10_11_12_13;
+    //     _8_9_10_11_12_13.children.add(_11_12);
+    //     _11_12.parent = _8_9_10_11_12_13;
+    //     _8_9_10_11_12_13.children.add(_13); 
+    //     _13.parent = _8_9_10_11_12_13;
+    //     HNode _2_14_15 = new HNode(16, 2);
+    //     _2_14_15.children.add(_14_15);
+    //     _14_15.parent = _2_14_15;
+    //     //Now the root level 1 node
+    //     HNode _root = new HNode(16, 1);
+    //     _root.children.add(_1_2_3_4_5_6_7);
+    //     _1_2_3_4_5_6_7.parent = _root;
+    //     _root.children.add(_8_9_10_11_12_13);   
+    //     _8_9_10_11_12_13.parent = _root;
+    //     _root.children.add(_2_14_15);
+    //     _2_14_15.parent = _root;
+    //     _root.isRoot = true;
+    //     /////
+    //     /// Now we need to recompute the bitmaps for all of these nodes, starting from the bottom up.
+    //     _1_2.recomputeBitmap();
+    //     _3.recomputeBitmap();
+    //     _4_5.recomputeBitmap();
+    //     _6_7.recomputeBitmap();
+    //     _8_9.recomputeBitmap();
+    //     _10.recomputeBitmap();
+    //     _11_12.recomputeBitmap();
+    //     _13.recomputeBitmap();
+    //     _14_15.recomputeBitmap();
+    //     _1_2_3_4_5_6_7.recomputeBitmap();
+    //     _8_9_10_11_12_13.recomputeBitmap();
+    //     _2_14_15.recomputeBitmap();
+    //     _root.recomputeBitmap();
+    //     /////Now to remove all the leaves as roots and add the main root
+    //     for (HNode root : forest.roots){
+    //         if (root.leafData != null && root.leafData.vertex != 0){
+    //             root.isRoot = false;
+    //             forest.roots.remove(root);
+    //             root.depth = 3;
+    //         }
+    //     }
+    //     forest.roots.add(_root);
+    //     return forest;
+        
+    // }
+
+    public static HForest buildForestForTest() {
+        int n = 16;
+        HForest forest = HForest.emptyForTest(n);
+        int dMax = forest.dMax;
+
+        // -------------------------------------------------------
+        // Step 1: Create all leaf nodes
+        // -------------------------------------------------------
+        for (int v = 1; v <= 15; v++) {
+            HNode leafNode = new HNode(n, dMax);
+            leafNode.weight   = 1;
+            leafNode.isRoot   = false;
+            leafNode.leafData = new HLeaf(v, dMax, leafNode);
+            forest.leaves[v]  = leafNode;
+        }
+
+        // -------------------------------------------------------
+        // Step 2: Create depth-2 (i+1 component) nodes
+        // These group vertices that share depth-2 witness edges
+        // -------------------------------------------------------
+        HNode _1_2   = makeInternalNode(n, 3, 2, forest.leaves[1], forest.leaves[2]);
+        HNode _3     = makeInternalNode(n, 3, 1, forest.leaves[3]);
+        HNode _4_5   = makeInternalNode(n, 3, 2, forest.leaves[4], forest.leaves[5]);
+        HNode _6_7   = makeInternalNode(n, 3, 2, forest.leaves[6], forest.leaves[7]);
+        HNode _8_9   = makeInternalNode(n, 3, 2, forest.leaves[8], forest.leaves[9]);
+        HNode _10    = makeInternalNode(n, 3, 1, forest.leaves[10]);
+        HNode _11_12 = makeInternalNode(n, 3, 2, forest.leaves[11], forest.leaves[12]);
+        HNode _13    = makeInternalNode(n, 3, 1, forest.leaves[13]);
+        HNode _14_15 = makeInternalNode(n, 3, 2, forest.leaves[14], forest.leaves[15]);
+
+        // -------------------------------------------------------
+        // Step 3: Create depth-1 (component) nodes
+        // -------------------------------------------------------
+        HNode _left  = makeInternalNode(n, 2, 7,  _1_2, _3, _4_5, _6_7);
+        HNode _mid   = makeInternalNode(n, 2, 7,  _8_9, _10, _11_12, _13);
+        HNode _right = makeInternalNode(n, 2, 2,  _14_15);
+
+        // -------------------------------------------------------
+        // Step 4: Create depth-0 root
+        // -------------------------------------------------------
+        HNode root = makeInternalNode(n, 1, 16, _left, _mid, _right);
+        root.isRoot = true;
+        forest.roots.add(root);
+
+        // -------------------------------------------------------
+        // Step 5: Register edge info at leaves
+        // All edges at the leaf level — depth is the edge depth, 
+        // not the node depth
+        // -------------------------------------------------------
+        // Depth-1 witness edges (within depth-2 nodes)
+        addWitness(forest, 1, 2, 2);   // {1,2} promoted to depth 2
+        addWitness(forest, 6, 7, 2);   // {6,7} promoted to depth 2
+        addWitness(forest, 8, 9, 2);   // {8,9} promoted to depth 2
+        addWitness(forest, 11,12, 2);  // {11,12} promoted to depth 2
+        addWitness(forest, 14,15, 2);  // {14,15} promoted to depth 2
+
+        // Depth-1 witness edges (spanning depth-2 components, within depth-1 nodes)
+        addWitness(forest, 2, 3, 1);
+        addWitness(forest, 3, 5, 1);
+        addWitness(forest, 5, 6, 1);
+        addWitness(forest, 8, 13, 1);
+        addWitness(forest, 13, 10, 1);
+        addWitness(forest, 9, 11, 1);
+
+        // Primary edges (non-witness, within same component)
+        addPrimary(forest, 3, 4, 1);
+        addPrimary(forest, 10, 12, 1);
+
+        // -------------------------------------------------------
+        // Step 6: Recompute bitmaps bottom-up
+        // -------------------------------------------------------
+        for (int v = 1; v <= 15; v++) {
+            forest.leaves[v].recomputeBitmapsUp();
+        }
+
+        return forest;
+    }
+
+    // -------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------
+    private static HNode makeInternalNode(int n, int depth, int weight, HNode... children) {
+        HNode node = new HNode(n, depth);
+        node.weight = weight;
+        node.isRoot = false;
+        for (HNode child : children) {
+            child.parent = node;
+            node.children.add(child);
+        }
+        node.recomputeBitmap();
+        return node;
+    }
+
+    private static void addWitness(HForest f, int u, int v, int depth) {
+        f.leaves[u].leafData.add_edge_info(v, depth, EndpointType.WITNESS);
+        f.leaves[v].leafData.add_edge_info(u, depth, EndpointType.WITNESS);
+    }
+
+    private static void addPrimary(HForest f, int u, int v, int depth) {
+        f.leaves[u].leafData.add_edge_info(v, depth, EndpointType.PRIMARY);
+        f.leaves[v].leafData.add_edge_info(u, depth, EndpointType.PRIMARY);
+    }
+
     // -------------------------------------------------------------------------
     // ENTRY POINT
     // -------------------------------------------------------------------------
@@ -600,14 +935,19 @@ public class HForestTest {
 
         TestResult result = new TestResult();
 
-        testBasicInsert(result);
-        testNonWitnessDelete(result);
-        testWitnessDeleteWithReplacement(result);
-        testWitnessDeleteNoReplacement(result);
-        testInsertAfterDelete(result);
-        testLeafIntegrity(result);
-        testEdgeCases(result);
-        testStress(result);  // run stress last — noisiest output
+        // testBasicInsert(result);
+        // testNonWitnessDelete(result);
+        // testWitnessDeleteWithReplacement(result);
+        // testWitnessDeleteNoReplacement(result);
+        // testInsertAfterDelete(result);
+        // testLeafIntegrity(result);
+        // testEdgeCases(result);
+
+        HForest hf = buildForestForTest();
+        printForestState(hf);
+
+
+        //testStress(result);  // run stress last — noisiest output
 
         result.printSummary();
 
@@ -703,10 +1043,6 @@ class TestResult {
             failures.forEach(f -> System.out.println("  - " + f));
         }
         System.out.println("========================================");
-    }
-
-    public static void main(String[] args) {
-        HForestTest.main(args);
     }
 }
 

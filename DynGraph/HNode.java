@@ -1,3 +1,4 @@
+
 package DynGraph;
 
 import java.util.ArrayList;
@@ -43,8 +44,8 @@ public class HNode {
     // |+| => (1 − log^(−𝛽)𝑛) (𝑎 + 𝑏) ≤ 𝑎 |+| 𝑏 ≤ 𝑎 + 𝑏. 
     int weight; // number of endpoints in the subtree rooted at this node
     public int[] approximateCounters; // array of approximate counters for each (i, primary)-leaf pair
-    private static int nextId = 0;
-    public final int ID = nextId++;
+    private static long nextId = 0;
+    public final long ID = nextId++;
     public HLeaf leafData; // only for leaf nodes, stores the isEndpoint bitmap and witness edges
     public boolean isRoot;
     public boolean[][] isEndpoint;
@@ -82,7 +83,7 @@ public class HNode {
 
     public static HNode root(HNode node){
         HNode current = node;
-        while (current != null && current.depth > 0){
+        while (current.parent != null && current.depth > 0){
             current = current.parent;
         }
         return current;

@@ -3,37 +3,6 @@ package DynGraph;
 import java.util.*;
 
 
-enum EndpointType {
-    WITNESS, PRIMARY, SECONDARY
-}
-
-class EdgeRecord {
-    public int neighbor; // the other endpoint of the edge
-    public int depth;    // the depth at which this edge is currently stored
-    public EndpointType type; // PRIMARY, SECONDARY, or WITNESS
-    public int source; // the vertex at which this record is stored (for easy reference)
-    public EdgeRecord(int source, int neighbor, int depth, EndpointType type) {
-        this.source = source;
-        this.neighbor = neighbor;
-        this.depth = depth;
-        this.type = type;
-    }
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        EdgeRecord that = (EdgeRecord) o;
-        return source == that.source &&
-               neighbor == that.neighbor &&
-               depth == that.depth &&
-               type == that.type;
-    }
-    @Override
-    public int hashCode() {
-        return Objects.hash(source, neighbor, depth, type);
-    }
-}
-
 // Manages the full hierarchy forest H.
 // One H-root per connected component.
 // One H-leaf per original vertex.
@@ -43,7 +12,7 @@ public class HForest {
     public final int dMax;
     public final int betaLogLogN;
     public Map<Integer, HNode> vertexToLeaf; // maps original vertex to its H-leaf node
-    public Map<EdgeRecord, HNode> edgeMap;
+    //public Map<EdgeRecord, HNode> edgeMap;
     // leaves[v] = the H-leaf node for original vertex v
     public final HNode[] leaves;
 
@@ -52,7 +21,7 @@ public class HForest {
 
     public HForest(int n) {
         this.n    = n;
-        this.dMax = Math.max(1, (int) Math.floor(Math.log(n) / Math.log(2))) + 1;
+        this.dMax = Math.max(1, (int) Math.floor(Math.log(n) / Math.log(2)));
 
         double logN    = Math.log(n) / Math.log(2);
         double logLogN = Math.log(Math.max(2, logN)) / Math.log(2);
@@ -60,7 +29,7 @@ public class HForest {
 
         this.leaves = new HNode[n];
         this.roots  = new HashSet<>();
-
+        this.vertexToLeaf = new HashMap<>();
         // Initially: each vertex is its own component.
         //initialize every lead node
         // Each leaf is also its own root (a single-node hierarchy tree).
@@ -71,12 +40,31 @@ public class HForest {
             HNode leaf = new HNode(n, 1);
             leaf.depth = dMax+1;
             leaf.weight         = 1;
-            leaf.leafData       = new HLeaf(v, 1, leaf);
+            leaf.leafData       = new HLeaf(v, leaf.depth, leaf);
             leaf.isRoot         = true;
-            leaves[v]           = leaf;
+            this.leaves[v]           = leaf;
             //to start with, all leaves are roots
-            roots.add(leaf);
+            this.roots.add(leaf);
+            this.vertexToLeaf.put(v, leaf);
+            System.out.println("Initialized leaf for vertex " + v + " with depth " + leaf.depth + "ID = " + leaf.ID);
         }
+    }
+
+    // In HForest.java — add a private constructor for testing
+    private HForest(int n, boolean empty) {
+        this.n    = n;
+        this.dMax = Math.max(1, (int) Math.floor(Math.log(n) / Math.log(2))) + 1;
+        double logN    = Math.log(n) / Math.log(2);
+        double logLogN = Math.log(Math.max(2, logN)) / Math.log(2);
+        this.betaLogLogN = Math.max(1, (int) Math.ceil(2 * logLogN));
+        this.leaves = new HNode[n];
+        this.roots  = new HashSet<>();
+        
+        // No initialization — caller builds everything
+    }
+
+    public static HForest emptyForTest(int n) {
+        return new HForest(n, true);
     }
 
     // ---------------------------------------------------------------
@@ -128,10 +116,12 @@ public class HForest {
             if (rootU == leaves[u]) {
                 leaves[u].parent = newroot;
                 newroot.children.add(leaves[u]);
+                leaves[u].depth = dMax+1;
             }
             if (rootV == leaves[v]) {
                 leaves[v].parent = newroot;
                 newroot.children.add(leaves[v]);
+                leaves[v].depth = dMax+1;
             }
         }
 
@@ -147,12 +137,14 @@ public class HForest {
         //     leaves[u].recomputeCounter(1, betaLogLogN);
         //     propagateCounterUp(leaves[u], 1);
         // }
+        System.out.println("Added edge {" + u + ", " + v + "} of type " + rec.type);
     }
 
 
 
     public EndpointType getEdgeType(int u, int v){
         HNode leaf = leaves[u];
+
         for (int i = 1; i <= dMax; i++){
             if (leaf.leafData.isEndpoint[0][i]){ //if this is a witness edge, we need to add the neighbor to the queue
                 for (int neighbor : leaf.leafData.witness_edges[i]){
@@ -224,7 +216,7 @@ public class HForest {
         leafv.recomputeBitmapsUp();
 
         if(type != EndpointType.WITNESS){
-            edgeMap.remove(new EdgeRecord(u, v, depth, type));
+            //edgeMap.remove(new EdgeRecord(u, v, depth, type));
             System.out.println("Deleted non witness edge {" + u + ", " + v + "} at depth " + depth);
             return true;
         }
@@ -246,7 +238,7 @@ public class HForest {
             System.out.println("Error: u and v are not in the same component at this depth");
             return false;
         }
-        edgeMap.remove(new EdgeRecord(u, v, depth, type));
+        //edgeMap.remove(new EdgeRecord(u, v, depth, type));
         //TODO: the recomputing here is not nice, storing this informaion across recursive calls would be bettre
         HashSet<HLeaf> total_c_u_leaves = new HashSet<>();
         HashSet<HLeaf> c_u_leaves = new HashSet<>();
@@ -266,8 +258,10 @@ public class HForest {
             //
             if (leaf.isEndpoint[0][depth]){ // If this leaf has a witness edge at this depth, we can add it to c_u
                 for (int neighbor : leaf.witness_edges[depth]){
-                   c_u_leaves.add(leaves[neighbor].leafData);
-                   total_c_u_leaves.add(leaves[neighbor].leafData);
+                    if (!total_c_u_leaves.contains(leaves[neighbor].leafData)){
+                        c_u_leaves.add(leaves[neighbor].leafData);
+                        total_c_u_leaves.add(leaves[neighbor].leafData);
+                    }
                 }
             }
             //-------
@@ -277,8 +271,10 @@ public class HForest {
             //
             if (leaf.isEndpoint[0][depth]){ //if this is a witness edge, we need to add the neighbor to the queue
                 for (int neighbor : leaf.witness_edges[depth]){
-                    c_v_leaves.add(leaves[neighbor].leafData);
-                    total_c_v_leaves.add(leaves[neighbor].leafData);
+                    if (!total_c_v_leaves.contains(leaves[neighbor].leafData)){
+                        c_v_leaves.add(leaves[neighbor].leafData);
+                        total_c_v_leaves.add(leaves[neighbor].leafData);
+                    } 
                 }
             }
         }
@@ -359,6 +355,7 @@ public class HForest {
             for (HNode nodeu : c_u){
                 child = mergeRoots(nodeu, child);
             }
+            this.roots.remove(child);
             child.parent = u_i;
             u_i.children.add(child);
             u_i.children.removeAll(c_u);
@@ -417,34 +414,73 @@ public class HForest {
 
             }
         }
-        if (depth == 1) //no replacement at the root, so u_i and v_i become new roots
+        if (depth <= 1) //no replacement at the root, so u_i and v_i become new roots
+        //the roots just have the same thing twice, what the fuck
         {
+            //c_u is the one that raises level to i+1. Cv stays the same. 
+            // Therefore, if c_v is just the leaf, then v_i must specify leaf_info and update v's leaf
             HNode v_i = new HNode(n, depth);
-            roots.remove(u_i);
+            this.roots.remove(u_i);
             u_i.isRoot = true;
-            u_i.children.addAll(c_u);
+            //u_i is just apath node with one child, which is the new u_i_1 that has all of c_u as its children.
+            HNode u_i_1 = new HNode(n, depth+1);
+
+            u_i.children.clear();
+            u_i_1.children.addAll(c_u);
+            for (HNode node : c_u){
+                node.parent = u_i_1;
+                node.isRoot = false;
+                //TODO: need to increase the level of this component to join the other components at level i+1
+            }
             v_i.weight = u_i.weight - c_u_weight;
             u_i.weight = c_u_weight;
-            
+            u_i_1.weight = c_u_weight;
+            //circular pointers somewhere
             v_i.children.addAll(c_v);
+            for (HNode node : c_v){
+                node.parent = v_i;
+                node.isRoot = false;
+            }
+            if (c_v.size() == 1 && c_v.iterator().next().leafData != null){ //if c_v is just the leaf, then v_i must specify leaf_info and update v's leaf
+                v_i.leafData = c_v.iterator().next().leafData;
+                v_i.leafData.node = v_i;
+                leaves[v_i.leafData.vertex] = v_i;
+            }
+            promoteWitnessEdges(u_i, depth);
+            u_i_1.recomputeBitmap();
             v_i.isRoot = true;
             u_i.recomputeBitmap();
             v_i.recomputeBitmap();
-            roots.add(u_i);
-            roots.add(v_i);
+            v_i.parent = null;
+            u_i.parent = null;
+            
+            this.roots.add(u_i);
+            this.roots.add(v_i);
             return true;
         }
-        //no replacement, so we split the components into their own HNodes at depth i-1, and recursively call deletion again with depth = depth - 1.
+        //no replacement at this level, so we split the components into their own HNodes at depth i-1, and recursively call deletion again with depth = depth - 1.
         HNode parent = u_i.parent;
         parent.children.remove(u_i);
         u_i.depth = depth;
         HNode v_i = new HNode(n, depth);
         u_i.children.clear();
-        u_i.children.addAll(c_u);
+        HNode u_i_1 = new HNode(n, depth+1);
+        u_i_1.children.addAll(c_u);
+        for (HNode node : c_u){
+            node.parent = u_i_1;
+        }
+        u_i.children.add(u_i_1);
+        u_i_1.parent = u_i;
+        u_i_1.weight = c_u_weight;
+        promoteWitnessEdges(u_i, depth); //mapping all the edges that used to join i+1 components to i+1, so they refer to u_i_1 instead of u_i
         v_i.weight = u_i.weight - c_u_weight;
         u_i.weight = c_u_weight;
         v_i.children.addAll(c_v);
+        for (HNode node : c_v){
+            node.parent = v_i;
+        }
         u_i.recomputeBitmap();
+        u_i_1.recomputeBitmap();
         v_i.recomputeBitmap();
         u_i.parent = parent;
         v_i.parent = parent;
@@ -673,6 +709,11 @@ public class HForest {
         return null;
     }
 
+    public void add_edge_at_depth(int u, int v, int depth, EndpointType type) {
+        
+    }
+
+
     // Promote a non-witness edge to witness status
     private void promoteToWitness(EdgeRecord rec, int depth) {
         int u = rec.neighbor; // this is relative. in a real impl
@@ -691,8 +732,12 @@ public class HForest {
     private void promoteWitnessEdgesRecursive(HNode node, int depth) {
         if (node.leafData != null) {
             List<EdgeRecord> witnesses = node.leafData.get(depth, EndpointType.WITNESS);
-            for (EdgeRecord rec : witnesses)
-                rec.depth = depth - 1;
+            for (EdgeRecord rec : witnesses){
+                rec.depth = depth + 1;
+                //TODO: replace with whatever shortcut bs
+                node.leafData.promote_witness_edge(rec.neighbor, depth);
+                node.recomputeBitmapsUp();
+            }
             return;
         }
         for (HNode child : node.children)
