@@ -15,28 +15,29 @@ public class HLeaf {
     public int d_max; // d_max
     public int vertex; // the vertex that this leaf corresponds to
     public int depth_of_node; // the depth of the node that this leaf corresponds to
+    @SuppressWarnings("unchecked")
     public HLeaf(int vertex, int dMax, HNode node) {
         this.node = node;
         this.vertex = vertex;
         this.d_max = dMax;
         isEndpoint = new boolean[3][dMax+1];
-        witness_edges = new HashSet[dMax+1];
+        witness_edges = (HashSet<Integer>[]) new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
-            witness_edges[i] = new HashSet<Integer>();
+            witness_edges[i] = new HashSet<>();
         }
-        primary_edges = new HashSet[dMax+1];
+        primary_edges = (HashSet<Integer>[])new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
-            primary_edges[i] = new HashSet<Integer>();
+            primary_edges[i] = new HashSet<>();
         }
-        secondary_edges = new HashSet[dMax+1];
+        secondary_edges = (HashSet<Integer>[])new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
-            secondary_edges[i] = new HashSet<Integer>();
+            secondary_edges[i] = new HashSet<>();
         }
         //this.depth = dMax;
         this.depth_of_node = node.depth;
     }
 
-    public void add_edge_info(int v, int depth, EndpointType type){
+    public void add_edge_info(int v, int depth, endpointType type){
         switch (type) {
             case WITNESS -> {
                 // WITNESS
@@ -81,7 +82,7 @@ public class HLeaf {
             isEndpoint[0][depth] = false;
         }
     }
-    public void remove_edge(int v, int depth, EndpointType type){
+    public void remove_edge(int v, int depth, endpointType type){
         switch (type) {
             case WITNESS -> remove_witness_edge(v, depth);
             case PRIMARY -> remove_primary_edge(v, depth);
@@ -90,13 +91,13 @@ public class HLeaf {
     }
     public void promote_primary_edge(int v, int depth){
         remove_primary_edge(v, depth);
-        add_edge_info(v, depth + 1, EndpointType.PRIMARY);
+        add_edge_info(v, depth + 1, endpointType.PRIMARY);
         recomputeBitmap();
         node.recomputeBitmapsUp();
     }
     public void promote_witness_edge(int v, int depth){
         remove_witness_edge(v, depth);
-        add_edge_info(v, depth + 1, EndpointType.WITNESS); 
+        add_edge_info(v, depth + 1, endpointType.WITNESS); 
         recomputeBitmap();
         node.recomputeBitmapsUp();
     }
@@ -124,14 +125,14 @@ public class HLeaf {
         return this.isEndpoint;
     }
 
-    public ArrayList<EdgeRecord> get(int i, EndpointType t){
+    public ArrayList<EdgeRecord> get(int i, endpointType t){
             //get the edges of type t at depth i that this leaf is an endpoint of
             ArrayList<EdgeRecord> edges = new ArrayList<>();
             HashSet<Integer> neighbours;
             switch (t) {
-                case EndpointType.WITNESS -> neighbours = witness_edges[i];
-                case EndpointType.PRIMARY -> neighbours = primary_edges[i];
-                case EndpointType.SECONDARY -> neighbours = secondary_edges[i];
+                case endpointType.WITNESS -> neighbours = witness_edges[i];
+                case endpointType.PRIMARY -> neighbours = primary_edges[i];
+                case endpointType.SECONDARY -> neighbours = secondary_edges[i];
                 default -> throw new IllegalStateException("Unexpected value: " + t);
             }
             for (int v : neighbours){

@@ -7,12 +7,6 @@ import java.util.HashSet;
 import java.util.Map;
 
 
-enum HNodeType {
-    branching, singlechild, leaf, root
-}
-
-enum endpointType {WITNESS, PRIMARY, SECONDARY}
-
 public class HNode {
     public int depth; // depth of the node in the HForest
     //when depth is 0, it is a root
@@ -20,7 +14,7 @@ public class HNode {
     //public HashSet<Integer> nodes_covered;
     public ArrayList<HNode> children;
     public HNode parent;
-    public HNodeType nodeType;
+    // public HNodeType nodeType;
     // public HashMap<Integer, HashSet<Integer>> primary_edges;
     // public HashMap<Integer, HashSet<Integer>> secondary_edges;
 
@@ -37,7 +31,7 @@ public class HNode {
     //approximate counters
     // for each (i, primary)-leaf pair, we maintain the approximate number of (i, primary)-endpoints touching the leaf.
     float beta = 2.0f; // error parameter for the approximate counters
-    static float[] approximateCounter = new float[2]; //first is the mantissa, 2nd is exponent. No. counters = concatenation of m and e => (beta + 1)log log n + 1 bits.
+    //static float[] approximateCounter = new float[2]; //first is the mantissa, 2nd is exponent. No. counters = concatenation of m and e => (beta + 1)log log n + 1 bits.
     //mantissa = {0, 1}^(betaloglogn) bit string and exponent = {0, 1}^(loglogn + 1) bit string
     //integer representation is m2^e.
     //when adding 2 approximate counters, round DOWN to nearest approximate counter value. THis is done by
@@ -57,7 +51,7 @@ public class HNode {
         this.edges_being_covered = new HashMap<>();
         this.children = new ArrayList<>();
         this.parent = null;
-        this.nodeType = HNodeType.leaf;
+        //this.nodeType = HNodeType.leaf;
         this.leafData = null;
         this.isEndpoint = new boolean[3][D_MAX + 1]; //3 types of endpoints, and we need to store whether this node is an endpoint for each possible depth up to D_MAX
         //initialize all endpoints to false
@@ -67,7 +61,7 @@ public class HNode {
             }
         }
         this.approximateCounters = new int[D_MAX + 1]; // we need to store an approximate counter for each possible depth up to D_MAX
-        this.weight = 1; // initially, the weight of a leaf node is 1, since it represents one vertex. For non-leaf nodes, the weight will be the sum of the weights of its children. This is used to maintain the invariant that the weight of a node at depth d is at most n/2^d.
+        this.weight = 0; // initially, the weight of a leaf node is 1, since it represents one vertex. For non-leaf nodes, the weight will be the sum of the weights of its children. This is used to maintain the invariant that the weight of a node at depth d is at most n/2^d.
         this.isRoot = false;
 
     }
@@ -78,6 +72,11 @@ public class HNode {
         if (obj == null || getClass() != obj.getClass()) return false;
         HNode oth = (HNode)(obj);
         return this.ID == oth.ID;
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(ID);
     }
 
 
@@ -149,6 +148,7 @@ public class HNode {
         if (this.leafData != null){
             //this is a leaf node, so we can just copy the isEndpoint bitmap from the leaf data
             this.leafData.recomputeBitmap(); //recompute the bitmap for the leaf data first, since it may have changed since the last time we computed the bitmap for this node
+            this.weight = 1;
             for (int i = 0; i < 3; i++) {
                 System.arraycopy(this.leafData.isEndpoint[i], 0, this.isEndpoint[i], 0, D_MAX);
             }
@@ -159,7 +159,14 @@ public class HNode {
                 this.isEndpoint[i][j] = false;
             }
         }
+        
+
         for (HNode child : children) {
+            //this.weight += child.weight;
+            
+            if(child.leafData!=null){
+                //this.weight += 1;
+            }
             for (int i = 0; i < 3; i++) {
                 for (int j = 0; j < D_MAX; j++) {
                     this.isEndpoint[i][j] = this.isEndpoint[i][j] || child.isEndpoint[i][j];
@@ -171,12 +178,13 @@ public class HNode {
     public void recomputeBitmapsUp(){
         //recompute the isEndpoint bitmaps for this node and all its ancestors based on the edges being covered and the node types of its children
         HNode current = this;
+        //also update the weights
         while (current != null){
+            //current.weight = 0; // reset weight to 1 for leaf nodes, and will be updated based on children for non-leaf nodes
             current.recomputeBitmap();
             current = current.parent;
         }
     }
-   
 
 }
 

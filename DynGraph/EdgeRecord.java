@@ -4,9 +4,9 @@ import java.util.Objects;
 class EdgeRecord {
     public int neighbor; // the other endpoint of the edge
     public int depth;    // the depth at which this edge is currently stored
-    public EndpointType type; // PRIMARY, SECONDARY, or WITNESS
+    public endpointType type; // PRIMARY, SECONDARY, or WITNESS
     public int source; // the vertex at which this record is stored (for easy reference)
-    public EdgeRecord(int source, int neighbor, int depth, EndpointType type) {
+    public EdgeRecord(int source, int neighbor, int depth, endpointType type) {
         this.source = source;
         this.neighbor = neighbor;
         this.depth = depth;
