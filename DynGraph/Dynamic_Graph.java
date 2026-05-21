@@ -2,26 +2,26 @@ package DynGraph;
 
 public class Dynamic_Graph {
     int n; 
-    HTree forest;
-    //keep a map from integer nodes to all the HNodes they hit
-    // Map<Integer, HashSet<HNode>> nodeMap;
-    // Map<Integer, HashMap<Integer, HNode>> edgeMap;
+    // HTree forest;
+    // //keep a map from integer nodes to all the HNodes they hit
+    // // Map<Integer, HashSet<HNode>> nodeMap;
+    // // Map<Integer, HashMap<Integer, HNode>> edgeMap;
 
-    public Dynamic_Graph(int n) {
-        this.n = n;
-        forest = new HTree(n);
-        //TODO: !!!!!!!!!!!!!!!!!!!!
-        //should actually make this a forest of just all the roots. 
+    // public Dynamic_Graph(int n) {
+    //     this.n = n;
+    //     forest = new HTree(n);
+    //     //TODO: !!!!!!!!!!!!!!!!!!!!
+    //     //should actually make this a forest of just all the roots. 
 
 
-        // nodeMap = new HashMap<>();
-        // edgeMap = new HashMap<>();
+    //     // nodeMap = new HashMap<>();
+    //     // edgeMap = new HashMap<>();
 
-    }
+    // }
 
-    public boolean connected(int u, int v){
-        return forest.connected(u, v);
-    }
+    // public boolean connected(int u, int v){
+    //     return forest.connected(u, v);
+    // }
 
     // public HNode addEdge(int u, int v){
     //     if (connected(u, v)){

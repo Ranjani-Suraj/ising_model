@@ -90,11 +90,11 @@ public class HForest {
             ////System.out.println("Error: edge already exists");
             return; // edge already exists
         }
-        EdgeRecord rec = new EdgeRecord(u, v, 1, endpointType.PRIMARY);
+        EdgeRecord rec = new EdgeRecord(u, v, 1, EndpointType.PRIMARY);
         
         if (!connected(u, v)) {
             // Make it a witness edge and merge the two components
-            rec.type = endpointType.WITNESS;
+            rec.type = EndpointType.WITNESS;
             HNode rootU = getRoot(leaves[u]);
             HNode rootV = getRoot(leaves[v]);
             //if the roots are themselves, then they are still leaves. We always add an edge at level 1, so we would need to promote the leaf to level 2, and then merge the two level 2 nodes.
@@ -143,7 +143,7 @@ public class HForest {
 
 
 
-    public endpointType getEdgeType(int u, int v){
+    public EndpointType getEdgeType(int u, int v){
         HNode leaf = leaves[u];
 
         for (int i = 1; i <= dMax; i++){
@@ -151,7 +151,7 @@ public class HForest {
                 for (int neighbor : leaf.leafData.witness_edges[i]){
                     if (neighbor == v){
                         ////System.out.println("WITNESS");
-                        return endpointType.WITNESS;
+                        return EndpointType.WITNESS;
                     }
                 }
             }
@@ -159,7 +159,7 @@ public class HForest {
                 for (int neighbor : leaf.leafData.primary_edges[i]){
                     if (neighbor == v){
                         ////System.out.println("PRIMARY");
-                        return endpointType.PRIMARY;
+                        return EndpointType.PRIMARY;
                     }
                 }
             }
@@ -167,7 +167,7 @@ public class HForest {
                 for (int neighbor : leaf.leafData.secondary_edges[i]){
                     if (neighbor == v){
                         ////System.out.println("SECONDARY");
-                        return endpointType.SECONDARY;
+                        return EndpointType.SECONDARY;
                     }
                 }
             }
@@ -189,7 +189,7 @@ public class HForest {
         int depth = recU.depth;
         HNode leafu = leaves[u];
         HNode leafv = leaves[v];
-        endpointType type = getEdgeType(u, v);
+        EndpointType type = getEdgeType(u, v);
         
         if (type == null) return; // edge doesn't exist
         leafu.leafData.remove_edge(v, depth, type);
@@ -197,7 +197,7 @@ public class HForest {
         leafu.recomputeBitmapsUp();
         leafv.recomputeBitmapsUp();
 
-        if(type != endpointType.WITNESS){
+        if(type != EndpointType.WITNESS){
             //edgeMap.remove(new EdgeRecord(u, v, depth, type));
             //System.out.println("Deleted non witness edge {" + u + ", " + v + "} at depth " + depth);
             return;
@@ -229,13 +229,13 @@ public class HForest {
         }
         if (depth < 1 || depth > dMax) 
             return false; // invalid depth
-        if (findEdgeRecord(u, v) != null && findEdgeRecord(u, v).type != endpointType.WITNESS) {
+        if (findEdgeRecord(u, v) != null && findEdgeRecord(u, v).type != EndpointType.WITNESS) {
             //System.out.println("Error: edge is not a witness edge");
             return false; // edge is not a witness edge
         }
         HNode leafu = leaves[u];
         HNode leafv = leaves[v];
-        // endpointType type = getEdgeType(u, v);
+        // EndpointType type = getEdgeType(u, v);
         
         // if (type == null) return false; // edge doesn't exist
         // leafu.leafData.remove_edge(v, depth, type);
@@ -243,7 +243,7 @@ public class HForest {
         // leafu.recomputeBitmapsUp();
         // leafv.recomputeBitmapsUp();
 
-        // if(type != endpointType.WITNESS){
+        // if(type != EndpointType.WITNESS){
         //     //edgeMap.remove(new EdgeRecord(u, v, depth, type));
         //     //System.out.println("Deleted non witness edge {" + u + ", " + v + "} at depth " + depth);
         //     return true;
@@ -498,10 +498,10 @@ public class HForest {
                         else{//edge found. 
                             //need to promote it to a witness edge in the edgeMap
                             //need to convert hte primary edge to a witness edge now 
-                            neighborLeaf.remove_edge(nleaf.vertex, depth, endpointType.PRIMARY);
-                            nleaf.remove_edge(neighbor, depth, endpointType.PRIMARY);
-                            neighborLeaf.add_edge_info(nleaf.vertex, depth, endpointType.WITNESS);
-                            nleaf.add_edge_info(neighbor, depth, endpointType.WITNESS);
+                            neighborLeaf.remove_edge(nleaf.vertex, depth, EndpointType.PRIMARY);
+                            nleaf.remove_edge(neighbor, depth, EndpointType.PRIMARY);
+                            neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.WITNESS);
+                            nleaf.add_edge_info(neighbor, depth, EndpointType.WITNESS);
                             nleaf.node.recomputeBitmapsUp();
                             neighborLeaf.node.recomputeBitmapsUp();
                             return true;
@@ -712,14 +712,14 @@ public class HForest {
                             else{ //edge found. 
                                 //need to promote it to a witness edge in the edgeMap
                                 //need to convert hte primary edge to a witness edge now 
-                                neighborLeaf.remove_edge(leaf.vertex, i, endpointType.PRIMARY);
-                                leaf.remove_edge(neighbor, i, endpointType.PRIMARY);
-                                neighborLeaf.add_edge_info(leaf.vertex, i, endpointType.WITNESS);
-                                leaf.add_edge_info(neighbor, i, endpointType.WITNESS);
+                                neighborLeaf.remove_edge(leaf.vertex, i, EndpointType.PRIMARY);
+                                leaf.remove_edge(neighbor, i, EndpointType.PRIMARY);
+                                neighborLeaf.add_edge_info(leaf.vertex, i, EndpointType.WITNESS);
+                                leaf.add_edge_info(neighbor, i, EndpointType.WITNESS);
                                 
                                 //promoteToWitness(new EdgeRecord(neighbor, i, EndpointType.PRIMARY), i);
                                 //mergeComponents(c_u.iterator().next(), c_v.iterator().next());
-                                return new EdgeRecord(leaf.vertex, neighbor, i, endpointType.PRIMARY);
+                                return new EdgeRecord(leaf.vertex, neighbor, i, EndpointType.PRIMARY);
                             }
                         }
                     }
@@ -905,13 +905,13 @@ public class HForest {
 
     private EdgeRecord scanForReplacement(HNode node, HNode otherComp, int depth) {
         if (node.leafData != null) {
-            for (EdgeRecord rec : node.leafData.get(depth, endpointType.PRIMARY)) {
+            for (EdgeRecord rec : node.leafData.get(depth, EndpointType.PRIMARY)) {
                 HNode otherLeaf  = leaves[rec.neighbor];
                 HNode otherSide  = getComponentAtLevel(otherLeaf, depth);
                 if (otherSide == otherComp) return rec;
             }
             // Also check secondary endpoints during enumeration procedure
-            for (EdgeRecord rec : node.leafData.get(depth, endpointType.SECONDARY)) {
+            for (EdgeRecord rec : node.leafData.get(depth, EndpointType.SECONDARY)) {
                 HNode otherLeaf  = leaves[rec.neighbor];
                 HNode otherSide  = getComponentAtLevel(otherLeaf, depth);
                 if (otherSide == otherComp) return rec;
@@ -925,7 +925,7 @@ public class HForest {
         return null;
     }
 
-    public void add_edge_at_depth(int u, int v, int depth, endpointType type) {
+    public void add_edge_at_depth(int u, int v, int depth, EndpointType type) {
         
     }
 
@@ -935,7 +935,7 @@ public class HForest {
         int u = rec.neighbor; // this is relative. in a real impl
                               // you'd carry both endpoints
         // STUB: update type fields and bitmaps
-        rec.type = endpointType.WITNESS;
+        rec.type = EndpointType.WITNESS;
     }
 
     // Promote all i-witness edges touching a component to depth i+1.
@@ -947,7 +947,7 @@ public class HForest {
 
     private void promoteWitnessEdgesRecursive(HNode node, int depth) {
         if (node.leafData != null) {
-            List<EdgeRecord> witnesses = node.leafData.get(depth, endpointType.WITNESS);
+            List<EdgeRecord> witnesses = node.leafData.get(depth, EndpointType.WITNESS);
             for (EdgeRecord rec : witnesses){
                 rec.depth = depth + 1;
                 //TODO: replace with whatever shortcut bs
@@ -993,7 +993,7 @@ public class HForest {
     // Find the EdgeRecord for edge {u,v} at u's leaf
     private EdgeRecord findEdgeRecord(int u, int v) {
         for (int i = 1; i <= dMax; i++)
-            for (endpointType t : endpointType.values())
+            for (EndpointType t : EndpointType.values())
                 for (EdgeRecord rec : leaves[u].leafData.get(i, t))
                     if (rec.neighbor == v) return rec;
         return null;
@@ -1009,7 +1009,7 @@ public class HForest {
         System.out.println("HNode(depth=" + node.depth + ", weight=" + node.weight + ", isRoot=" + node.isRoot + ")");
         if (node.leafData != null) {
             for (int i = 1; i <= dMax; i++) {
-                for (endpointType t : endpointType.values()) {
+                for (EndpointType t : EndpointType.values()) {
                     List<EdgeRecord> edges = node.leafData.get(i, t);
                     if (!edges.isEmpty()) {
                         for (EdgeRecord rec : edges) {

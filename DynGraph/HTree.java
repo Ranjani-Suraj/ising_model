@@ -21,15 +21,15 @@ public class HTree {
     }
     //assuming we are 100% adding this node, not checking for connectivity
     public void add_node_to_root(HNode node, int[] edge){
-        if (node.nodeType == HNodeType.leaf){
-            //the node only represents one vertex, it probably connects to some parent
-            this.root.add_child_to_node(node, edge);
-            //does what edge the node covers depend on... it will have edges if the parent node is a root only
-        }
-        else{
-            //this should never happen since you should only be able to add leaf nodes. Anything else will always need ot happen externally
-            return;
-        }
+        // if (node.nodeType == HNodeType.leaf){
+        //     //the node only represents one vertex, it probably connects to some parent
+        //     this.root.add_child_to_node(node, edge);
+        //     //does what edge the node covers depend on... it will have edges if the parent node is a root only
+        // }
+        // else{
+        //     //this should never happen since you should only be able to add leaf nodes. Anything else will always need ot happen externally
+        //     return;
+        // }
     }
 
     //underlying architecture for this hierarchy forest could be stored as a treap? which would make no sense at all...

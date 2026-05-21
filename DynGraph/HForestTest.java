@@ -45,7 +45,7 @@ public class HForestTest {
 
     // Check that HForest leaf stores the expected neighbors at a depth/type
     static void assertLeafNeighbors(HForest hf, int vertex,
-                                     int depth, endpointType type,
+                                     int depth, EndpointType type,
                                      Set<Integer> expected,
                                      String context, TestResult result) {
         Set<Integer> actual = hf.leaves[vertex].leafData
@@ -126,13 +126,13 @@ public class HForestTest {
         hf.add_edge(2, 3);
         // This should create a chain of witnesses at increasing depths
         for (int d = 1; d < hf.dMax; d++) {
-            assertLeafNeighbors(hf, 0, d, endpointType.WITNESS,
+            assertLeafNeighbors(hf, 0, d, EndpointType.WITNESS,
                                 Set.of(1), "testLevels leaf 0 depth " + d, result);
-            assertLeafNeighbors(hf, 1, d, endpointType.WITNESS,
+            assertLeafNeighbors(hf, 1, d, EndpointType.WITNESS,
                                 Set.of(0, 2), "testLevels leaf 1 depth " + d, result);
-            assertLeafNeighbors(hf, 2, d, endpointType.WITNESS,
+            assertLeafNeighbors(hf, 2, d, EndpointType.WITNESS,
                                 Set.of(1, 3), "testLevels leaf 2 depth " + d, result);
-            assertLeafNeighbors(hf, 3, d, endpointType.WITNESS,
+            assertLeafNeighbors(hf, 3, d, EndpointType.WITNESS,
                                 Set.of(2), "testLevels leaf 3 depth " + d, result);
         }
     }
@@ -478,7 +478,7 @@ public class HForestTest {
         System.out.println("\n--- Suite 7: Stress Test ---");
 
         Random rng = new Random(42); // fixed seed for reproducibility
-        int n = 100;
+        int n = 1000;
         int rounds = 1;
         int opsPerRound = 1000000;
         
@@ -509,6 +509,10 @@ public class HForestTest {
                         "stress round=" + round + " op=" + op
                         + " insert(" + u + "," + v + ")", result);
                     // printForestNodes(hf);
+                    if (op%500 == 0) {
+                        System.out.println("Completed stress round " + op + "/" + opsPerRound + 
+                        " (avg time per op: " + (total_time / (op+1)) + " ms) + " + total_time + " ms so far");
+                    }
 
                 } else {
                     // Pick a random existing edge to delete
@@ -744,13 +748,13 @@ public class HForestTest {
     }
 
     private static void addWitness(HForest f, int u, int v, int depth) {
-        f.leaves[u].leafData.add_edge_info(v, depth, endpointType.WITNESS);
-        f.leaves[v].leafData.add_edge_info(u, depth, endpointType.WITNESS);
+        f.leaves[u].leafData.add_edge_info(v, depth, EndpointType.WITNESS);
+        f.leaves[v].leafData.add_edge_info(u, depth, EndpointType.WITNESS);
     }
 
     private static void addPrimary(HForest f, int u, int v, int depth) {
-        f.leaves[u].leafData.add_edge_info(v, depth, endpointType.PRIMARY);
-        f.leaves[v].leafData.add_edge_info(u, depth, endpointType.PRIMARY);
+        f.leaves[u].leafData.add_edge_info(v, depth, EndpointType.PRIMARY);
+        f.leaves[v].leafData.add_edge_info(u, depth, EndpointType.PRIMARY);
     }
 
     // -------------------------------------------------------------------------

@@ -37,7 +37,7 @@ public class HLeaf {
         this.depth_of_node = node.depth;
     }
 
-    public void add_edge_info(int v, int depth, endpointType type){
+    public void add_edge_info(int v, int depth, EndpointType type){
         switch (type) {
             case WITNESS -> {
                 // WITNESS
@@ -82,7 +82,7 @@ public class HLeaf {
             isEndpoint[0][depth] = false;
         }
     }
-    public void remove_edge(int v, int depth, endpointType type){
+    public void remove_edge(int v, int depth, EndpointType type){
         switch (type) {
             case WITNESS -> remove_witness_edge(v, depth);
             case PRIMARY -> remove_primary_edge(v, depth);
@@ -91,13 +91,13 @@ public class HLeaf {
     }
     public void promote_primary_edge(int v, int depth){
         remove_primary_edge(v, depth);
-        add_edge_info(v, depth + 1, endpointType.PRIMARY);
+        add_edge_info(v, depth + 1, EndpointType.PRIMARY);
         recomputeBitmap();
         node.recomputeBitmapsUp();
     }
     public void promote_witness_edge(int v, int depth){
         remove_witness_edge(v, depth);
-        add_edge_info(v, depth + 1, endpointType.WITNESS); 
+        add_edge_info(v, depth + 1, EndpointType.WITNESS); 
         recomputeBitmap();
         node.recomputeBitmapsUp();
     }
@@ -125,14 +125,14 @@ public class HLeaf {
         return this.isEndpoint;
     }
 
-    public ArrayList<EdgeRecord> get(int i, endpointType t){
+    public ArrayList<EdgeRecord> get(int i, EndpointType t){
             //get the edges of type t at depth i that this leaf is an endpoint of
             ArrayList<EdgeRecord> edges = new ArrayList<>();
             HashSet<Integer> neighbours;
             switch (t) {
-                case endpointType.WITNESS -> neighbours = witness_edges[i];
-                case endpointType.PRIMARY -> neighbours = primary_edges[i];
-                case endpointType.SECONDARY -> neighbours = secondary_edges[i];
+                case EndpointType.WITNESS -> neighbours = witness_edges[i];
+                case EndpointType.PRIMARY -> neighbours = primary_edges[i];
+                case EndpointType.SECONDARY -> neighbours = secondary_edges[i];
                 default -> throw new IllegalStateException("Unexpected value: " + t);
             }
             for (int v : neighbours){
