@@ -5,8 +5,10 @@ import ETTree.Treap;
 import ETTree.TreapNode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 
 class map_edge {
@@ -41,16 +43,25 @@ public class Main {
         // hf.add_edge(3, 4);
         // hf.add_edge(4, 5);
         // hf.drawHForest();
-        HForestTest hft = new HForestTest();
-
+        
+        test_dyn_grp(10000);
+        HForestTest hf = new HForestTest();
+        hf.main(null);
+    }
+    private static Map<Integer, Set<Integer>> deepCopy(Map<Integer, Set<Integer>> graph) {
+        Map<Integer, Set<Integer>> copy = new HashMap<>();
+        for (Map.Entry<Integer, Set<Integer>> entry : graph.entrySet()) {
+            copy.put(entry.getKey(), new HashSet<>(entry.getValue()));
+        }
+        return copy;
     }
 
-    void test_dyn_grp(){
-        TreapNode.random = new Random(42);
-        test_dyn t = new test_dyn(10, 100000);
-        boolean res = t.test();
-        System.out.println("Result: "+res);
-        System.out.println("****************************");
+    static void test_dyn_grp(int n){
+        // TreapNode.random = new Random(42);
+        // test_dyn t = new test_dyn(10, 100000);
+        // boolean res = t.test();
+        // System.out.println("Result: "+res);
+        // System.out.println("****************************");
 
 
         System.out.println("Let us begin (battle music)");
@@ -70,14 +81,14 @@ public class Main {
         //obv size isnt working which is a thing in and of itself  
 
 
-        int iters = 2000;
+        int iters = 40;
         Map<Double, ArrayList<double[]>> results = new HashMap<>();
         long[] times = new long[iters];
         Random random = new Random(42);
         int p_num = 10;
         double[] p_choices = new double[p_num];//{0.0015, 0.0016, 0.0017, 0.0018, 0.0019, 0.002, 0.0021, 0.0022, 0.0023, 0.0024, 0.0025};
-        int n = 1000;
-        p_choices[0] = 0.5/n; //0.5, 0.6, 0.7, 0.8 ,0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 
+        
+        p_choices[0] = 0.7/n; //0.5, 0.6, 0.7, 0.8 ,0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 
         HashMap<Double, ArrayList<Double>> sizes = new HashMap<>();
          sizes.put(p_choices[0], new ArrayList<>());
         for(int i = 1; i<=p_num-1;  i+=1){
@@ -88,6 +99,17 @@ public class Main {
         int[] q_options = {2}; //{1, 2};
         Map<Integer, Map<Integer, Map<Double, ArrayList<double[]>>>> final_results = new HashMap<>();
         // {n, {q, {p, {largest comp, time}}}}
+        Map<Integer, Set<Integer>> graph = new HashMap<>();
+        Map<Integer, Set<Integer>> graph2 = new HashMap<>();
+        for(int i = 0; i < n; i++){
+            graph.put(i, new java.util.HashSet<>());
+            graph2.put(i, new java.util.HashSet<>());
+            for(int j = 0; j < n; j++){
+                if(i!=j){
+                    graph.get(i).add(j);
+                }
+            }
+        }
         for(int i = 0; i < iters; i++){
             int ch = Math.abs((int)(random.nextDouble()*p_choices.length));
             int n_index = random.nextInt(graph_sizes.length);
@@ -114,8 +136,21 @@ public class Main {
             }
             System.out.println("n = "+n+", epochs = "+n*n+", p = "+p_choices[ch] + " q = "+q);
             long start1 = System.nanoTime();
-            CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, false);
-            double[] output = cp.couple(false); //largest component, iterations
+            boolean vanilla = false;
+            boolean warm_start = false;
+            double[] output;
+            if(vanilla){
+                System.out.println("Running vanilla coupling from the past...");
+                //output = Dfs.glauberQ(deepCopy(graph), deepCopy(graph2), p_choices[ch], q);
+                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla);
+                output = cp.couple();
+            }
+            else{
+                System.out.println("Running dynamic coupling from the past...");
+                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla);
+                output = cp.couple(); //largest component, iterations
+            }
+            
             
             long end1 = System.nanoTime();
             times[i] = end1-start1;
@@ -181,16 +216,13 @@ public class Main {
         //     avg_size = 0.0; avg_time = 0.0;
         // }
         System.out.println("Average overall time: "+avg_overall_time/iters);
-        for (int qi = 2; qi <=3; qi++){
-            int q = qi;
-            System.out.println("Q = "+q+" : ");
-            for (int i = 0; i<p_choices.length; i++){
+        for (int i = 0; i<p_choices.length; i++){
                 System.out.println("Sizes for p = "+p_choices[i]+" : \\");
                 for (int j = 0; j < sizes.get(p_choices[i]).size(); j++){
                     System.out.print(""+sizes.get(p_choices[i]).get(j)+" ");
                 }
                 System.out.println("\\");
-            }
+            
         }
         //System.out.println("Sizes" + sizes.toString());
     }

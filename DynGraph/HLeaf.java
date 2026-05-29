@@ -1,5 +1,6 @@
 package DynGraph;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 
 
@@ -16,10 +17,12 @@ public class HLeaf {
     public int vertex; // the vertex that this leaf corresponds to
     public int depth_of_node; // the depth of the node that this leaf corresponds to
     @SuppressWarnings("unchecked")
+    public HashMap<Integer, EdgeRecord> edgeLookup;
     public HLeaf(int vertex, int dMax, HNode node) {
         this.node = node;
         this.vertex = vertex;
         this.d_max = dMax;
+        edgeLookup = new HashMap<>();
         isEndpoint = new boolean[3][dMax+1];
         witness_edges = (HashSet<Integer>[]) new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
@@ -37,24 +40,77 @@ public class HLeaf {
         this.depth_of_node = node.depth;
     }
 
-    public void add_edge_info(int v, int depth, EndpointType type){
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        HLeaf hLeaf = (HLeaf) o;
+        return vertex == hLeaf.vertex; // two leaves are equal if they correspond to the same vertex
+    }
+
+    @Override
+    public int hashCode() {
+        return vertex;
+    }
+
+    public void add_edge_info(int v, int depth, EndpointType type) {
+
+        boolean wasEmpty;
         switch (type) {
             case WITNESS -> {
-                // WITNESS
+                wasEmpty = witness_edges[depth].isEmpty();
                 witness_edges[depth].add(v);
-                isEndpoint[0][depth] = true;
+                if (wasEmpty) {
+                    isEndpoint[0][depth] = true;
+                    node.propagateBitSet(0, depth);
+                }
             }
             case PRIMARY -> {
-                // PRIMARY
+                wasEmpty = primary_edges[depth].isEmpty();
                 primary_edges[depth].add(v);
-                isEndpoint[1][depth] = true;
+                if (wasEmpty) {
+                    isEndpoint[1][depth] = true;
+                    node.propagateBitSet(1, depth);
+                }
             }
             case SECONDARY -> {
-                // SECONDARY
+                wasEmpty = secondary_edges[depth].isEmpty();
                 secondary_edges[depth].add(v);
-                isEndpoint[2][depth] = true;
+                if (wasEmpty) {
+                    isEndpoint[2][depth] = true;
+                    node.propagateBitSet(2, depth);
+                }
             }
         }
+        edgeLookup.put(v, new EdgeRecord(this.vertex, v, depth, type));
+        node.recomputeBitmap();
+    }
+
+    public void remove_edge(int v, int depth, EndpointType type) {
+        switch (type) {
+            case WITNESS -> {
+                witness_edges[depth].remove(v);
+                if (witness_edges[depth].isEmpty() && isEndpoint[0][depth]) {
+                    isEndpoint[0][depth] = false;
+                    node.propagateBitClear(0, depth);
+                }
+            }
+            case PRIMARY -> {
+                primary_edges[depth].remove(v);
+                if (primary_edges[depth].isEmpty() && isEndpoint[1][depth]) {
+                    isEndpoint[1][depth] = false;
+                    node.propagateBitClear(1, depth);
+                }
+            }
+            case SECONDARY -> {
+                secondary_edges[depth].remove(v);
+                if (secondary_edges[depth].isEmpty() && isEndpoint[2][depth]) {
+                    isEndpoint[2][depth] = false;
+                    node.propagateBitClear(2, depth);
+                }
+            }
+        }
+        edgeLookup.remove(v);
     }
     public void add_secondary_edge(int v, int depth){
         secondary_edges[depth].add(v); 
@@ -64,42 +120,45 @@ public class HLeaf {
         witness_edges[depth].add(v); 
         isEndpoint[0][depth] = true;
     }
-    public void remove_primary_edge(int v, int depth){
-        primary_edges[depth].remove(v); 
-        if (primary_edges[depth].isEmpty()){
-            isEndpoint[1][depth] = false;
-        }
+    public void remove_primary_edge(int v, int depth) {
+        remove_edge(v, depth, EndpointType.PRIMARY);
     }
     public void remove_secondary_edge(int v, int depth){
-        secondary_edges[depth].remove(v); 
-        if (secondary_edges[depth].isEmpty()){
-            isEndpoint[2][depth] = false;
-        }
+        remove_edge(v, depth, EndpointType.SECONDARY);
     }
     public void remove_witness_edge(int v, int depth){
-        witness_edges[depth].remove(v); 
-        if (witness_edges[depth].isEmpty()){
-            isEndpoint[0][depth] = false;
-        }
+        remove_edge(v, depth, EndpointType.WITNESS);
     }
-    public void remove_edge(int v, int depth, EndpointType type){
-        switch (type) {
-            case WITNESS -> remove_witness_edge(v, depth);
-            case PRIMARY -> remove_primary_edge(v, depth);
-            case SECONDARY -> remove_secondary_edge(v, depth);
-        }
+    // public void remove_edge(int v, int depth, EndpointType type){
+    //     switch (type) {
+    //         case WITNESS -> remove_witness_edge(v, depth);
+    //         case PRIMARY -> remove_primary_edge(v, depth);
+    //         case SECONDARY -> remove_secondary_edge(v, depth);
+    //     }
+    // }
+
+    @Override
+    public String toString() {
+        return "ID:"+node.ID+" vertex:"+vertex+" depth:"+node.depth;
     }
+
     public void promote_primary_edge(int v, int depth){
         remove_primary_edge(v, depth);
         add_edge_info(v, depth + 1, EndpointType.PRIMARY);
-        recomputeBitmap();
-        node.recomputeBitmapsUp();
+        // node.propagateBitSet(1, depth + 1);
+        // node.recomputeBitmapsUp();
     }
-    public void promote_witness_edge(int v, int depth){
-        remove_witness_edge(v, depth);
+    // public void promote_witness_edge(int v, int depth){
+    //     remove_witness_edge(v, depth);
+    //     add_edge_info(v, depth + 1, EndpointType.WITNESS); 
+    //     recomputeBitmap();
+    //     node.recomputeBitmapsUp();
+    // }
+    public void promote_witness_edge(int v, int depth) {
+        // This removes at depth, adds at depth+1 -> two incremental updates
+        // not a full recompute
+        remove_edge(v, depth, EndpointType.WITNESS);
         add_edge_info(v, depth + 1, EndpointType.WITNESS); 
-        recomputeBitmap();
-        node.recomputeBitmapsUp();
     }
 
 

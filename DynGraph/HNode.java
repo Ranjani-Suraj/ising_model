@@ -1,9 +1,10 @@
 
 package DynGraph;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 
@@ -12,8 +13,10 @@ public class HNode {
     //when depth is 0, it is a root
     public Map<Integer, HashSet<Integer>> edges_being_covered; //this should not technically exist but i can keep it as a sanity check
     //public HashSet<Integer> nodes_covered;
-    public ArrayList<HNode> children;
+    // In HNode
+    public LinkedHashSet<HNode> children;
     public HNode parent;
+    public int[][] childBitCount; // childBitCount[type][depth] = direct children with that bit set
     // public HNodeType nodeType;
     // public HashMap<Integer, HashSet<Integer>> primary_edges;
     // public HashMap<Integer, HashSet<Integer>> secondary_edges;
@@ -49,15 +52,18 @@ public class HNode {
         this.D_MAX = Math.max(1, (int) Math.floor(Math.log(n) / Math.log(2)))+1; // maximum degree of a node in the HForest, which is O(log n)
         this.depth = depth;
         this.edges_being_covered = new HashMap<>();
-        this.children = new ArrayList<>();
+        this.children = new LinkedHashSet<>();
         this.parent = null;
         //this.nodeType = HNodeType.leaf;
         this.leafData = null;
         this.isEndpoint = new boolean[3][D_MAX + 1]; //3 types of endpoints, and we need to store whether this node is an endpoint for each possible depth up to D_MAX
+        this.childBitCount = new int[3][D_MAX + 1];
         //initialize all endpoints to false
+        //means does this node have a primary/witness/secondary edge at depth i? This is the isEndpoint[i][j] field, where i is the type of endpoint and j is the depth
         for (int i = 0; i < 3; i++) {
             for (int j = 1; j <= D_MAX; j++) {
                 isEndpoint[i][j] = false;
+                childBitCount[i][j] = 0;
             }
         }
         this.approximateCounters = new int[D_MAX + 1]; // we need to store an approximate counter for each possible depth up to D_MAX
@@ -154,22 +160,38 @@ public class HNode {
             }
             return;
         }
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < D_MAX; j++) {
-                this.isEndpoint[i][j] = false;
-            }
+        //if it is not a leaf node, we recompute based on all the children
+        boolean[] empty = new boolean[D_MAX + 1];
+        for (int j = 0; j < D_MAX; j++) {
+            empty[j] = false;
         }
         
-
-        for (HNode child : children) {
-            //this.weight += child.weight;
+        // for (HNode child : children) {
+        //     //this.weight += child.weight;
             
-            if(child.leafData!=null){
-                //this.weight += 1;
-            }
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < D_MAX; j++) {
-                    this.isEndpoint[i][j] = this.isEndpoint[i][j] || child.isEndpoint[i][j];
+        //     if(child.leafData!=null){
+        //         //this.weight += 1;
+        //     }
+        //     for (int i = 0; i < 3; i++) {
+        //         System.arraycopy(this.isEndpoint[i], 0, empty, 0, D_MAX);
+        //         for (int j = 0; j < D_MAX; j++) {
+        //             this.isEndpoint[i][j] = this.isEndpoint[i][j] || child.isEndpoint[i][j];
+        //         }
+        //     }
+        // }
+
+        // Reset everything first
+        for (int t = 0; t < 3; t++) {
+            Arrays.fill(childBitCount[t], 0);
+            Arrays.fill(isEndpoint[t], false);
+        } 
+        for (HNode child : children) {
+            for (int t = 0; t < 3; t++) {
+                for (int d = 1; d <= D_MAX; d++) {
+                    if (child.isEndpoint[t][d]) {
+                        this.childBitCount[t][d]++;
+                        this.isEndpoint[t][d] = true;
+                    }
                 }
             }
         }
@@ -183,6 +205,44 @@ public class HNode {
             //current.weight = 0; // reset weight to 1 for leaf nodes, and will be updated based on children for non-leaf nodes
             current.recomputeBitmap();
             current = current.parent;
+        }
+    }
+
+    // Called when a leaf's bit goes from false to true
+    // if isEndpoint[i][depth] for this leaf becomes true, then we need to update all the HNodes on the path from this leaf to the root. 
+    // For each HNode on the path, we need to increment the childBitCount for (i, depth) by 1, and if the childBitCount for (i, depth) becomes 1, then we need to set isEndpoint[i][depth] to true for that HNode as well. We continue this process up the tree until we reach a HNode where the childBitCount for (i, depth) is already greater than 1, since in that case, the isEndpoint[i][depth] bit will already be set to true for that HNode and all its ancestors.
+    public void propagateBitSet(int type, int depth){
+        //propagate the bit set for (i, depth) up the tree. This should only be called when we are adding an edge to a leaf node, and we need to update the bitmaps of the ancestors of the leaf node based on the new edge.
+        HNode current = this.parent; 
+        while (current != null){
+            current.childBitCount[type][depth]++; //number of children who have a true for this type and depth
+            if (current.childBitCount[type][depth] == 1){ 
+                current.isEndpoint[type][depth] = true; 
+                current = current.parent; 
+            }
+            else{
+                break; // if the bit is already set, then we can stop propagating up since it will already be set for all ancestors
+            } 
+        }
+    }
+
+    // Called when a leaf's bit goes from true → false
+    public void propagateBitClear(int type, int depth) {
+        HNode current = this.parent;
+        while (current != null) {
+            if (current.childBitCount[type][depth] <= 0) {
+                // this should never happen, but if it does, we can just break out of the loop since the bit is already cleared for this node and all its ancestors
+                break;
+            }
+            current.childBitCount[type][depth]--;
+            if (current.childBitCount[type][depth] == 0) {
+                // no children have this bit — clear and continue
+                current.isEndpoint[type][depth] = false;
+                current = current.parent;
+            } else {
+                // siblings still have bit set — stop
+                break;
+            }
         }
     }
 
