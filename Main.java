@@ -44,7 +44,7 @@ public class Main {
         // hf.add_edge(4, 5);
         // hf.drawHForest();
         
-        test_dyn_grp(10000);
+        test_dyn_grp(15000, false, true, 100);
         HForestTest hf = new HForestTest();
         hf.main(null);
     }
@@ -56,7 +56,7 @@ public class Main {
         return copy;
     }
 
-    static void test_dyn_grp(int n){
+    static void test_dyn_grp(int n, boolean vanilla, boolean oldalg, int iters){
         // TreapNode.random = new Random(42);
         // test_dyn t = new test_dyn(10, 100000);
         // boolean res = t.test();
@@ -79,25 +79,28 @@ public class Main {
         //sum adjacent is sometimes negative which shouldtn be possible so thats a problem
         //so its failing because im updating twice since its in add_edge_level
         //obv size isnt working which is a thing in and of itself  
+        boolean randomtesting = true;
 
-
-        int iters = 40;
+        //int iters;
         Map<Double, ArrayList<double[]>> results = new HashMap<>();
         long[] times = new long[iters];
         Random random = new Random(42);
         int p_num = 10;
         double[] p_choices = new double[p_num];//{0.0015, 0.0016, 0.0017, 0.0018, 0.0019, 0.002, 0.0021, 0.0022, 0.0023, 0.0024, 0.0025};
         
-        p_choices[0] = 0.7/n; //0.5, 0.6, 0.7, 0.8 ,0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 
+        p_choices[0] = 0.5/n; //0.5, 0.6, 0.7, 0.8 ,0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 
         HashMap<Double, ArrayList<Double>> sizes = new HashMap<>();
          sizes.put(p_choices[0], new ArrayList<>());
-        for(int i = 1; i<=p_num-1;  i+=1){
+        double[] q_options = new double[10]; //numbers between 1 and 2
+        q_options[0] = 1.1;
+         for(int i = 1; i<=p_num-1;  i+=1){
             p_choices[i] = p_choices[i-1] + 0.2/n;
             sizes.put(p_choices[i], new ArrayList<>());
+            q_options[i] = q_options[i-1]+0.1;
+            System.out.println("p choice "+i+" is "+p_choices[i]+" and q choice "+(i-1)+" is "+q_options[i]);
         }
         int[] graph_sizes = {n};//, 2500, 500};
-        int[] q_options = {2}; //{1, 2};
-        Map<Integer, Map<Integer, Map<Double, ArrayList<double[]>>>> final_results = new HashMap<>();
+        Map<Integer, Map<Double, Map<Double, ArrayList<double[]>>>> final_results = new HashMap<>();
         // {n, {q, {p, {largest comp, time}}}}
         Map<Integer, Set<Integer>> graph = new HashMap<>();
         Map<Integer, Set<Integer>> graph2 = new HashMap<>();
@@ -110,13 +113,14 @@ public class Main {
                 }
             }
         }
+        int qind = 0, pind = 0;
         for(int i = 0; i < iters; i++){
-            int ch = Math.abs((int)(random.nextDouble()*p_choices.length));
+            int ch = randomtesting? Math.abs((int)(random.nextDouble()*p_choices.length)) : pind;
             int n_index = random.nextInt(graph_sizes.length);
             n = graph_sizes[n_index];
-            int q_index = (int)((random.nextInt(q_options.length)));
-            int q = q_options[q_index];
-            //int q = 2;
+            int q_index = randomtesting ? (int)((random.nextInt(q_options.length))) : qind;
+            double q = q_options[q_index];
+            //double q = 2;
             if (final_results.containsKey(n)){ //if n has not been hit yet
                 if (final_results.get(n).containsKey(q)){ //if this q fro this n has not been hit yet
                     if (!final_results.get(n).get(q).containsKey(p_choices[ch])){ //if this p for this q for this n has not been hit yet
@@ -136,32 +140,37 @@ public class Main {
             }
             System.out.println("n = "+n+", epochs = "+n*n+", p = "+p_choices[ch] + " q = "+q);
             long start1 = System.nanoTime();
-            boolean vanilla = false;
             boolean warm_start = false;
             double[] output;
             if(vanilla){
                 System.out.println("Running vanilla coupling from the past...");
                 //output = Dfs.glauberQ(deepCopy(graph), deepCopy(graph2), p_choices[ch], q);
-                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla);
+                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla, true);
                 output = cp.couple();
             }
             else{
                 System.out.println("Running dynamic coupling from the past...");
-                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla);
+                CouplingPast cp = new CouplingPast(n*n, n, p_choices[ch], q, warm_start, vanilla, oldalg);
                 output = cp.couple(); //largest component, iterations
             }
             
-            
+            double[] to_add_output = new double[3];
+            to_add_output[0] = output[0];
+            to_add_output[2] = output[1]; //iterations 
+            to_add_output[1] = times[i];
+            output = to_add_output;
             long end1 = System.nanoTime();
             times[i] = end1-start1;
             
-            System.out.println("Run "+i+"took "+times[i]+" nanoseconds, "+output[1]+" iterations, and gave largest cc "+output[0]+" for p = "+p_choices[ch]);
+            System.out.println("Run "+i+"took "+times[i]+" milliseconds, "+output[2]+" iterations, and gave largest cc "+output[0]+" for p = "+p_choices[ch]);
             output[1] = times[i];
             results.putIfAbsent(p_choices[ch], new ArrayList<>());
             results.get(p_choices[ch]).add(output);
             final_results.get(n).get(q).get(p_choices[ch]).add(output);
+            pind = (ch+1)%p_choices.length;
+            qind = (q_index+1)%q_options.length;
         }
-        //results: {p, {largest comp, iterations}}
+        //results: {p, {largest comp, runtime, iterations}}
         double avg_time = 0.0, avg_size = 0.0, avg_overall_time = 0.0;
         int index = 0;
         
@@ -171,13 +180,14 @@ public class Main {
             if (final_results.containsKey(n)){
                 System.out.print("For n = "+n+"-----------------------\n");
                 for(int _q = 0; _q < q_options.length; _q++){
-                    int q = q_options[_q];
+                    double q = q_options[_q];
                     if (final_results.get(n).containsKey(q)){
                         System.out.println(" For q = "+q+"------------------------\n");
                         for(int i = 0; i<p_choices.length; i++){
                             //double avg_time = final_results.get(n).get(q).get(p_choices[i])
                             int size = 0;
                             avg_size = 0.0; avg_time = 0.0;
+                            double avg_iterations = 0.0;
                             int index2 = 0;
                             if (final_results.get(n).get(q).containsKey(p_choices[i])){
                                 for(index2 = 0; index2 < final_results.get(n).get(q).get(p_choices[i]).size(); index2++){
@@ -190,10 +200,11 @@ public class Main {
                                     avg_size += t_c[0];
                                     avg_time += t_c[1];
                                     avg_overall_time += t_c[1];
+                                    avg_iterations += t_c[2];
                                 }
                             }
                             
-                            System.out.println("  for p = "+p_choices[i]+" , time "+avg_time/size+" avg size "+avg_size/size+" \\");
+                            System.out.println("  for p = "+p_choices[i]+" , time "+avg_time/size+" avg size "+avg_size/size+" iterations "+avg_iterations/size+" \\");
                         }
                     }
                 }

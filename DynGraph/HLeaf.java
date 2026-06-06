@@ -10,6 +10,7 @@ public class HLeaf {
     public HNode node;
     //These will return neighbours. Use the HForest edgeMap to get the corresponding HNode for each neighbour, and then get the neighbour vertex from the vertexToLeaf map
     // order of types is W P S
+    public int primary_edge_count[]; // primary_edge_count[i] = number of primary edges this vertex has at depth i
     public HashSet<Integer> witness_edges[]; //witness_edges.get(i) = set of neighbours this vertex has at depth i
     public HashSet<Integer> primary_edges[]; // primary_edges.get(i) = set of neighbours this vertex has at depth i that are primary edges
     public HashSet<Integer> secondary_edges[]; // secondary_edges.get(i) = set of neighbours this vertex has at depth i that are secondary edges
@@ -22,11 +23,13 @@ public class HLeaf {
         this.node = node;
         this.vertex = vertex;
         this.d_max = dMax;
+        primary_edge_count = new int[dMax+1];
         edgeLookup = new HashMap<>();
         isEndpoint = new boolean[3][dMax+1];
         witness_edges = (HashSet<Integer>[]) new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
             witness_edges[i] = new HashSet<>();
+            primary_edge_count[i] = 0;
         }
         primary_edges = (HashSet<Integer>[])new HashSet[dMax+1];
         for (int i = 1; i < dMax+1; i++) {
@@ -67,6 +70,9 @@ public class HLeaf {
             }
             case PRIMARY -> {
                 wasEmpty = primary_edges[depth].isEmpty();
+                if (!primary_edges[depth].contains(v)){
+                    primary_edge_count[depth]++;
+                }
                 primary_edges[depth].add(v);
                 if (wasEmpty) {
                     isEndpoint[1][depth] = true;
@@ -96,10 +102,13 @@ public class HLeaf {
                 }
             }
             case PRIMARY -> {
+                if (primary_edges[depth].contains(v) && primary_edge_count[depth] > 0){
+                    primary_edge_count[depth]--;
+                }
                 primary_edges[depth].remove(v);
                 if (primary_edges[depth].isEmpty() && isEndpoint[1][depth]) {
                     isEndpoint[1][depth] = false;
-                    node.propagateBitClear(1, depth);
+                    node.propagateBitClear(1, depth); 
                 }
             }
             case SECONDARY -> {

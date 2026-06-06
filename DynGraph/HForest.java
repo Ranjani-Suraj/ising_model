@@ -23,7 +23,7 @@ public class HForest {
     public double timeForRecompute = 0.0;
     public double timeForConnected = 0.0;
     public double timeInteractedWith = 0.0; //time spent overall while interacting with the HForest, including time spent in add_edge, delete_edge, and connected. This is for benchmarking purposes to see how much of the total time is spent in these functions versus other overhead.
-
+    public int numconn = 0;
     public HForest(int n) {
         this.n    = n;
         this.dMax = Math.max(1, (int) Math.floor(Math.log(n) / Math.log(2)));
@@ -78,6 +78,7 @@ public class HForest {
     //       giving O(log n / log log log n) worst case query time.
     // ---------------------------------------------------------------
     public boolean connected(int u, int v) {
+        numconn++;
         long start_time = System.nanoTime();
         boolean connected = HNode.root(leaves[u]) == HNode.root(leaves[v]);
         timeForConnected += System.nanoTime() - start_time;
@@ -363,6 +364,16 @@ public class HForest {
             timeForDeleteEdge += System.nanoTime() - start_time;
             return;
         }
+        double average = 0.0;
+        for(int i = depth; i <= dMax; i++){
+            average += leafu.primary_edge_count[i] + leafv.primary_edge_count[i];
+        }
+        average /= (dMax - depth + 1);
+        if(average != 0){
+            //System.out.println("Error: witness edge has primary neighbors at this depth, cannot delete");
+            timeForDeleteEdge += System.nanoTime() - start_time;
+             //witness edge cannot be deleted if it has primary neighbors at this depth, because those primary neighbors would be disconnected from the rest of the component
+        }
         delete_edge_at_depth(u, v, depth);
         //System.out.println("DELETED EDGE "+u+", "+v+" from depth "+depth);
         //start_recompute_time = System.nanoTime();
@@ -378,10 +389,10 @@ public class HForest {
     //if there are gaps, we can jsut take something at a level that is lower than the desired level
     public HNode getNodeAtDepth(HLeaf leafu, int depth){
         HNode current = leafu.node;
-        while (current.depth > depth){
+        while (current != null && current.depth > depth){
             current = current.parent;
         }
-        if (current.depth <= depth){
+        if (current != null && current.depth <= depth){
             return current;
         }
         return null;
@@ -443,82 +454,67 @@ public class HForest {
         HashSet<HNode> c_u = new HashSet<>();
         HashSet<HNode> c_v;
         c_u_leaves.add(leafu.leafData);
-        total_c_u_leaves.add(leafu.leafData);
+        //total_c_u_leaves.add(leafu.leafData);
         c_v_leaves.add(leafv.leafData);
-        total_c_v_leaves.add(leafv.leafData);
+        //total_c_v_leaves.add(leafv.leafData);
 
         // Instead of the HashSet-as-queue pattern, use two ArrayDeques
         ArrayDeque<HLeaf> queueU = new ArrayDeque<>();
         ArrayDeque<HLeaf> queueV = new ArrayDeque<>();
+        ArrayList<HLeaf> c_u_list = new ArrayList<>();
+        ArrayList<HLeaf> c_v_list = new ArrayList<>();
+
         queueU.add(leafu.leafData);
         total_c_u_leaves.add(leafu.leafData);
         queueV.add(leafv.leafData);
         total_c_v_leaves.add(leafv.leafData);
+        c_u_list.add(leafu.leafData);
+        c_v_list.add(leafv.leafData);
+        int p_neighbors_u = 0, p_neighbors_v = 0;
 
+                
         while (!queueU.isEmpty() && !queueV.isEmpty()) {
-            HLeaf leaf = queueU.poll(); // O(1), no iterator creation
+            HLeaf leaf = queueU.poll();
+            p_neighbors_u += leaf.primary_edge_count[depth];
             for (int i = depth; i <= dMax; i++) {
                 if (!leaf.isEndpoint[0][i]) continue;
                 for (int neighbor : leaf.witness_edges[i]) {
-                    if (total_c_u_leaves.add(leaves[neighbor].leafData)) { // add returns false if already present
-                        queueU.add(leaves[neighbor].leafData);
+                    HLeaf neighborLeaf = leaves[neighbor].leafData;
+                    if (total_c_u_leaves.add(neighborLeaf)) {
+                        c_u_list.add(neighborLeaf);
+                        queueU.add(neighborLeaf);
                     }
                 }
             }
-            // same for V side
-            leaf = queueV.poll(); // O(1), no iterator creation
+
+            leaf = queueV.poll();
+            p_neighbors_v += leaf.primary_edge_count[depth];
             for (int i = depth; i <= dMax; i++) {
                 if (!leaf.isEndpoint[0][i]) continue;
                 for (int neighbor : leaf.witness_edges[i]) {
-                    if (total_c_v_leaves.add(leaves[neighbor].leafData)) { // add returns false if already present
-                        queueV.add(leaves[neighbor].leafData);
+                    HLeaf neighborLeaf = leaves[neighbor].leafData;
+                    if (total_c_v_leaves.add(neighborLeaf)) {
+                        c_v_list.add(neighborLeaf);
+                        queueV.add(neighborLeaf);
                     }
                 }
             }
         }
-        c_u_leaves = total_c_u_leaves; // already the full set
-        c_v_leaves = total_c_v_leaves; // already the full set
 
-
-        // while(!c_u_leaves.isEmpty() && !c_v_leaves.isEmpty()){
-        //     HLeaf leaf = c_u_leaves.iterator().next();
-        //     c_u_leaves.remove(leaf);
-        //     visited.add(leaf.vertex);
-        //     //
-        //     for (int i = depth; i <= dMax; i++){
-        //         if (leaf.isEndpoint[0][i]){ // If this leaf has witness edges at this depth, we need to add the neighbors to the queue
-        //             for (int neighbor : leaf.witness_edges[i]){
-        //                 if (!total_c_u_leaves.contains(leaves[neighbor].leafData)){
-        //                     c_u_leaves.add(leaves[neighbor].leafData);
-        //                     total_c_u_leaves.add(leaves[neighbor].leafData);
-        //                     visited.add(neighbor);
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     leaf = c_v_leaves.iterator().next();
-        //     c_v_leaves.remove(leaf);
-        //     visited.add(leaf.vertex);
-        //     //
-        //     for(int i = depth; i <= dMax; i++){
-        //         if (leaf.isEndpoint[0][i]){ //if this is a witness edge, we need to add the neighbor to the queue
-        //             for (int neighbor : leaf.witness_edges[i]){
-        //                 if (!total_c_v_leaves.contains(leaves[neighbor].leafData)){
-        //                     c_v_leaves.add(leaves[neighbor].leafData);
-        //                     total_c_v_leaves.add(leaves[neighbor].leafData);
-        //                     visited.add(neighbor);
-        //                 } 
-        //             }
-        //         }
-        //     }
-        // }
-        //we dont know which ended, we just know one of htem did. Let us assert that u is finished but v is not
-        if (queueV.isEmpty() && !queueU.isEmpty()){
-            // V side finished first - swap so c_u_leaves is the smaller side
+        if (queueV.isEmpty() && !queueU.isEmpty()) {
             HashSet<HLeaf> total_temp = total_c_u_leaves;
             total_c_u_leaves = total_c_v_leaves;
             total_c_v_leaves = total_temp;
+            ArrayList<HLeaf> list_temp = c_u_list;
+            c_u_list = c_v_list;
+            c_v_list = list_temp;
+            int temp_neighbors = p_neighbors_u;
+            p_neighbors_u = p_neighbors_v;
+            p_neighbors_v = temp_neighbors;
         }
+
+        c_u_leaves = total_c_u_leaves;
+        c_v_leaves = total_c_v_leaves;
         //based on the size of the two sets of leaves, we can add the i-HNode to c_u
         //All children of u_i nodes not added to c_u are added to c_v
         
@@ -548,79 +544,36 @@ public class HForest {
                 }
             }
         }
-        // for (HLeaf leaf : c_u_leaves) {
-        //     HNode cur = leaf.node;
-        //     while (cur != null && cur.parent != u_i) {
-        //         cur = cur.parent;
-        //     }
-        //     if (cur != null) {
-        //         if (c_u.add(cur)) { // add() returns false if already present
-        //             c_u_weight += cur.weight;
-        //             c_v.remove(cur);
-        //         }
-        //     }
-        // }
-
-        // int manual_c_v_weight = 0;
-        // for (HNode node : c_v){
-        //     manual_c_v_weight += node.weight;
-        //     // if (node.leafData!= null){
-        //     //     manual_c_v_weight += 1;
-        //     // }
-        // }
-        // if(manual_c_v_weight != u_i.weight - c_u_weight){
-        //     //System.out.println("Error: weight mismatch. c_u_weight: " + c_u_weight + ", manual_c_v_weight: " + manual_c_v_weight + ", u_i.weight: " + u_i.weight);
-        // }
 
         //check the weights of c_u and c_v to ensure c_u is the smaller one if nto swap them
         if (c_u_weight > u_i.weight - c_u_weight){
             HashSet<HNode> temp = c_u;
             c_u = c_v;
-            c_v = temp;
-            // swap the weights as well
-            //int tempWeight = c_u_weight;
-            c_u_weight = u_i.weight - c_u_weight;
-            //swap the leaf sets as well
-            //HashSet<HLeaf> tempLeaves = c_u_leaves;
+            c_v = temp; 
+            c_u_weight = u_i.weight - c_u_weight; 
             c_u_leaves = c_v_leaves;
-            //c_v_leaves = tempLeaves;
-            
-            //tempLeaves = total_c_u_leaves;
-            // total_c_u_leaves = total_c_v_leaves;
-            // total_c_v_leaves = tempLeaves;
         }
+
         
         //promote all i-witness edges on c_u to (i+1)
         visited.clear();
+        //Arrays.fill(visited, null);
         ArrayDeque<HLeaf> queue = new ArrayDeque<>();
         for (HLeaf nleaf : c_u_leaves) queue.add(nleaf);
 
         while (!queue.isEmpty()) {
             HLeaf nleaf = queue.poll();
             visited.add(nleaf.vertex);
-            if (nleaf.isEndpoint[0][depth]){ //if it has witness edges at this depth, we need to promote them to the next depth
-                ArrayList<Integer> neighborsToPromote = new ArrayList<>(nleaf.witness_edges[depth]);
-                for(int neighbor : neighborsToPromote){
-                    //if (!visited.contains(neighbor)){
-                        //check if this neighbor is in c_u
-                        HLeaf neighborLeaf = leaves[neighbor].leafData;
-                        if (c_u_leaves.contains(neighborLeaf) && !visited.contains(neighbor)){
-                            //we need to promote the level of this witness edge to i+1, 
-                            // and then we will find it when we search for replacement edges at depth i+1
-                            neighborLeaf.promote_witness_edge(nleaf.vertex, depth);
-                            nleaf.promote_witness_edge(neighbor, depth);
-                            long start_recompute_time = System.nanoTime();
-                            // nleaf.node.recomputeBitmapsUp();
-                            // neighborLeaf.node.recomputeBitmapsUp();
-                            timeForRecompute += System.nanoTime() - start_recompute_time;
-                            queue.add(neighborLeaf);
-                        }
-                        else if (!c_u_leaves.contains(neighborLeaf)){
-                            //System.out.println("problem: witness edge not in c_u: " + nleaf.vertex + ", " + neighbor + " at depth " + depth);
-                        }
-                    //}
+            if (!nleaf.isEndpoint[0][depth]) continue;
+            int[] neighbors = nleaf.witness_edges[depth]
+                .stream().mapToInt(Integer::intValue).toArray();
+            for (int neighbor : neighbors) {
+                HLeaf neighborLeaf = leaves[neighbor].leafData;
+                if (c_u_leaves.contains(neighborLeaf) && visited.contains(neighbor)) {
+                    neighborLeaf.promote_witness_edge(nleaf.vertex, depth);
+                    nleaf.promote_witness_edge(neighbor, depth);
+                    queue.add(neighborLeaf);
                 }
-                
             }
         }
 
@@ -643,60 +596,227 @@ public class HForest {
 
         //Now we can try to search for replacement edges. 
 
+        //sampling time
+
+        Random rand = new Random();
+        if(p_neighbors_u > 1){
+            // System.out.println("No primary neighbors on smaller side, skipping sampling");
+            //return false;
+        }
+        int samplesize = (int) Math.log(Math.log(p_neighbors_u + 1)) + 1;
+int working_key = -1, working_value = -1;
+int num_bridges = 0;
+int actual_cycles = 0;
+Map<Integer, Integer> sampled = new HashMap<>();
+
+for (int i = 0; i < samplesize; i++) {
+    HLeaf nleaf = c_u_list.get(rand.nextInt(c_u_list.size()));
+    actual_cycles++;
+    if (!nleaf.isEndpoint[1][depth]) {
+        i--;
+        if (actual_cycles > c_u_list.size() * 2) break;
+        continue;
+    }
+    ArrayList<Integer> primaries = new ArrayList<>(nleaf.primary_edges[depth]);
+    int neighbor = primaries.get(rand.nextInt(primaries.size()));
+    HLeaf neighborLeaf = leaves[neighbor].leafData;
+
+    if (sampled.containsKey(nleaf.vertex) && 
+        sampled.get(nleaf.vertex) == neighbor) {
+        i--;
+        if (actual_cycles > c_u_list.size() * 2) break;
+        continue;
+    }
+    sampled.put(nleaf.vertex, neighbor);
+
+    if (!c_u_leaves.contains(neighborLeaf)) {
+        num_bridges++;
+        working_key = nleaf.vertex;
+        working_value = neighbor;
+    }
+}
+
+if (num_bridges > (samplesize / 2) && num_bridges > 0) {
+    HLeaf nleaf = leaves[working_key].leafData;
+    HLeaf neighborLeaf = leaves[working_value].leafData;
+    nleaf.remove_edge(neighborLeaf.vertex, depth, EndpointType.PRIMARY);
+    neighborLeaf.remove_edge(nleaf.vertex, depth, EndpointType.PRIMARY);
+    nleaf.add_edge_info(neighborLeaf.vertex, depth, EndpointType.WITNESS);
+    neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.WITNESS);
+    return true;
+}
+        //else, enumeration
+        //upgrade all i-secondary endpoints touching u_i to primary
+        //then enumerate all i-primary endpoints touoching u_i
+        //promote all non-witness edges to secondary edges at depth (i+1)
+
+
         //we can enumerate all the c_u leaves at the component at this depth
         //we only need to enumerate the leaves that have a primary edge at depth though
-        for(int i = depth; i <= dMax; i++){
-            ArrayList<HLeaf> leavesToCheck = new ArrayList<>(c_u_leaves);
-            for(HLeaf nleaf : leavesToCheck){
-                if(nleaf.isEndpoint[0][i]){ //if this leaf has neighbors at this depth or higher, enumerate them
-                    for (int neighbor : nleaf.witness_edges[i]){
-                        c_u_leaves.add(leaves[neighbor].leafData);
+        
+        // for(int i = depth; i <= dMax; i++){
+        //     ArrayList<HLeaf> leavesToCheck = new ArrayList<>(c_u_leaves);
+        //     for(HLeaf nleaf : leavesToCheck){
+        //         if(nleaf.isEndpoint[0][i]){ //if this leaf has neighbors at this depth or higher, enumerate them
+        //             for (int neighbor : nleaf.witness_edges[i]){
+        //                 c_u_leaves.add(leaves[neighbor].leafData);
                         
-                    }
-                }
-            }
-        }
-        visited.clear();
-        //search through all the leaves to see if any of them have primary edges that go outside the component, 
-        // if they do, then we can promote that edge to a witness edge and merge the components.
-        for (HLeaf nleaf : c_u_leaves){
-            visited.add(nleaf.vertex);
-            if (nleaf.isEndpoint[1][depth]){ //if it has a primary edge at this depth
-                ArrayList<Integer> neighborsToCheck = new ArrayList<>(nleaf.primary_edges[depth]);
-                for (int neighbor : neighborsToCheck){
-                    if (!visited.contains(neighbor)){
-                        //check if this neighbor is in c_u
-                        HLeaf neighborLeaf = leaves[neighbor].leafData;
-                        if (c_u_leaves.contains(neighborLeaf)){
-                            //we need to promote the level of this primary edge to i+1, 
-                            // and then we will find it when we search for replacement edges at depth i+1
-                            neighborLeaf.promote_primary_edge(nleaf.vertex, depth);
-                            nleaf.promote_primary_edge(neighbor, depth);
-                            long start_recompute_time = System.nanoTime();
-                            // nleaf.node.recomputeBitmapsUp();
-                            // neighborLeaf.node.recomputeBitmapsUp();
-                            timeForRecompute += System.nanoTime() - start_recompute_time;
-                        }
-                        else{//edge found. 
-                            //need to promote it to a witness edge in the edgeMap
-                            //need to convert hte primary edge to a witness edge now 
-                            neighborLeaf.remove_edge(nleaf.vertex, depth, EndpointType.PRIMARY);
-                            nleaf.remove_edge(neighbor, depth, EndpointType.PRIMARY);
-                            neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.WITNESS);
-                            nleaf.add_edge_info(neighbor, depth, EndpointType.WITNESS);
-                            long start_recompute_time = System.nanoTime();
-                            // nleaf.node.recomputeBitmapsUp();
-                            // neighborLeaf.node.recomputeBitmapsUp();
-                            timeForRecompute += System.nanoTime() - start_recompute_time;
-                            return true;
-                            //promoteToWitness(new EdgeRecord(neighbor, depth, EndpointType.PRIMARY), depth);
-                            //mergeComponents(c_u.iterator().next(), c_v.iterator().next());
-                        }
-                    }
-                }
+        //             }
+        //         }
+        //         if(nleaf.isEndpoint[2][i]) //if this leaf has secondary neighbors at this depth, promote them to primary and enumerate them
+        //         {
+        //             ArrayList<Integer> neighborsToPromote = new ArrayList<>(nleaf.secondary_edges[i]);
+        //             for (int neighbor : neighborsToPromote){
+        //                 HLeaf neighborLeaf = leaves[neighbor].leafData;
+        //                 nleaf.remove_edge(neighbor, i, EndpointType.SECONDARY);
+        //                 neighborLeaf.remove_edge(nleaf.vertex, i, EndpointType.SECONDARY);
+        //                 nleaf.add_edge_info(neighbor, i, EndpointType.PRIMARY);
+        //                 neighborLeaf.add_edge_info(nleaf.vertex, i, EndpointType.PRIMARY);
+        //                 long start_recompute_time = System.nanoTime();
+        //                 // nleaf.node.recomputeBitmapsUp();
+        //                 // neighborLeaf.node.recomputeBitmapsUp();
+        //                 timeForRecompute += System.nanoTime() - start_recompute_time;
+        //                 c_u_leaves.add(neighborLeaf);
+        //             }
+        //         }
+        //         if(nleaf.isEndpoint[1][i]){ 
+        //             //convert to secondary edge at depth i+1
+        //             ArrayList<Integer> neighborsToPromote = new ArrayList<>(nleaf.primary_edges[i]);
+        //             for (int neighbor : neighborsToPromote){
+        //                 HLeaf neighborLeaf = leaves[neighbor].leafData;
+        //                 nleaf.remove_edge(neighbor, i, EndpointType.PRIMARY);
+        //                 neighborLeaf.remove_edge(nleaf.vertex, i, EndpointType.PRIMARY);
+        //                 nleaf.add_edge_info(neighbor, i+1, EndpointType.SECONDARY);
+        //                 neighborLeaf.add_edge_info(nleaf.vertex, i+1, EndpointType.SECONDARY);
+        //                 long start_recompute_time = System.nanoTime();
+        //                 // nleaf.node.recomputeBitmapsUp();
+        //                 // neighborLeaf.node.recomputeBitmapsUp();
+        //                 timeForRecompute += System.nanoTime() - start_recompute_time;
+        //             }
+        //         }
+        //     }
+        // }
 
-            }
+        
+        // --- ENUMERATION PROCEDURE ---
+
+        // Pass 1: upgrade ALL i-secondary endpoints touching c_u to i-primary FIRST
+        // Pass 1: upgrade ALL i-secondary endpoints to i-primary
+        // Pass 1: upgrade ALL i-secondary endpoints to i-primary
+for (HLeaf nleaf : c_u_leaves) {
+    if (!nleaf.isEndpoint[2][depth]) continue;
+    ArrayList<Integer> secondaryNeighbors = 
+        new ArrayList<>(nleaf.secondary_edges[depth]);
+    for (int neighbor : secondaryNeighbors) {
+        HLeaf neighborLeaf = leaves[neighbor].leafData;
+        nleaf.remove_edge(neighbor, depth, EndpointType.SECONDARY);
+        neighborLeaf.remove_edge(nleaf.vertex, depth, EndpointType.SECONDARY);
+        nleaf.add_edge_info(neighbor, depth, EndpointType.PRIMARY);
+        neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.PRIMARY);
+    }
+}
+
+        // Pass 2: classify ALL i-primary endpoints — do not promote yet
+        // Pass 2: classify ALL i-primary endpoints
+List<int[]> replacementEdges = new ArrayList<>();
+List<int[]> nonReplacementEdges = new ArrayList<>();
+
+visited.clear();
+for (HLeaf nleaf : c_u_leaves) {
+    if (!nleaf.isEndpoint[1][depth]) continue;
+    visited.add(nleaf.vertex);
+    ArrayList<Integer> primaryNeighbors = 
+        new ArrayList<>(nleaf.primary_edges[depth]);
+    for (int neighbor : primaryNeighbors) {
+        if (visited.contains(neighbor)) continue; // skip already-processed side
+        HLeaf neighborLeaf = leaves[neighbor].leafData;
+        if (!c_u_leaves.contains(neighborLeaf)) {
+            replacementEdges.add(new int[]{nleaf.vertex, neighbor});
+        } else {
+            nonReplacementEdges.add(new int[]{nleaf.vertex, neighbor});
         }
+    }
+}
+
+        // Pass 3: promote all non-replacement edges to secondary at depth+1 FIRST
+        for (int[] edge : nonReplacementEdges) {
+            HLeaf a = leaves[edge[0]].leafData;
+            HLeaf b = leaves[edge[1]].leafData;
+            a.remove_edge(edge[1], depth, EndpointType.PRIMARY);
+            b.remove_edge(edge[0], depth, EndpointType.PRIMARY);
+            a.add_edge_info(edge[1], depth + 1, EndpointType.SECONDARY);
+            b.add_edge_info(edge[0], depth + 1, EndpointType.SECONDARY);
+        }
+
+        // Pass 4: use the first replacement edge if one was found
+        if (!replacementEdges.isEmpty()) {
+            int[] rep = replacementEdges.iterator().next();
+            HLeaf nleaf = leaves[rep[0]].leafData;
+            HLeaf neighborLeaf = leaves[rep[1]].leafData;
+            nleaf.remove_edge(rep[1], depth, EndpointType.PRIMARY);
+            neighborLeaf.remove_edge(rep[0], depth, EndpointType.PRIMARY);
+            nleaf.add_edge_info(rep[1], depth, EndpointType.WITNESS);
+            neighborLeaf.add_edge_info(rep[0], depth, EndpointType.WITNESS);
+            return true;
+        }
+
+
+        // if(working_key != -1 && working_value != -1){
+        //     // System.out.println("Using enumerated edge {" + working_key + ", " + working_value + "} as replacement");
+        //     HLeaf nleaf = leaves[working_key].leafData;
+        //     HLeaf neighborLeaf = leaves[working_value].leafData;
+        //     nleaf.remove_edge(neighborLeaf.vertex, depth + 1, EndpointType.SECONDARY);
+        //     neighborLeaf.remove_edge(nleaf.vertex, depth + 1, EndpointType.SECONDARY);
+        //     nleaf.add_edge_info(neighborLeaf.vertex, depth, EndpointType.WITNESS);
+        //     neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.WITNESS);
+        //     long start_recompute_time = System.nanoTime();
+        //     // nleaf.node.recomputeBitmapsUp();
+        //     // neighborLeaf.node.recomputeBitmapsUp();
+        //     timeForRecompute += System.nanoTime() - start_recompute_time;
+        //     return true;
+        // }
+        
+        // visited.clear();
+        // //search through all the leaves to see if any of them have primary edges that go outside the component, 
+        // // if they do, then we can promote that edge to a witness edge and merge the components.
+        // for (HLeaf nleaf : c_u_leaves){
+        //     visited.add(nleaf.vertex);
+        //     if (nleaf.isEndpoint[1][depth]){ //if it has a primary edge at this depth
+        //         ArrayList<Integer> neighborsToCheck = new ArrayList<>(nleaf.primary_edges[depth]);
+        //         for (int neighbor : neighborsToCheck){
+        //             if (!visited.contains(neighbor)){
+        //                 //check if this neighbor is in c_u
+        //                 HLeaf neighborLeaf = leaves[neighbor].leafData;
+        //                 if (c_u_leaves.contains(neighborLeaf)){
+        //                     //we need to promote the level of this primary edge to i+1, 
+        //                     // and then we will find it when we search for replacement edges at depth i+1
+        //                     neighborLeaf.promote_primary_edge(nleaf.vertex, depth);
+        //                     nleaf.promote_primary_edge(neighbor, depth);
+        //                     long start_recompute_time = System.nanoTime();
+        //                     // nleaf.node.recomputeBitmapsUp();
+        //                     // neighborLeaf.node.recomputeBitmapsUp();
+        //                     timeForRecompute += System.nanoTime() - start_recompute_time;
+        //                 }
+        //                 else{//edge found. 
+        //                     //need to promote it to a witness edge in the edgeMap
+        //                     //need to convert hte primary edge to a witness edge now 
+        //                     neighborLeaf.remove_edge(nleaf.vertex, depth, EndpointType.PRIMARY);
+        //                     nleaf.remove_edge(neighbor, depth, EndpointType.PRIMARY);
+        //                     neighborLeaf.add_edge_info(nleaf.vertex, depth, EndpointType.WITNESS);
+        //                     nleaf.add_edge_info(neighbor, depth, EndpointType.WITNESS);
+        //                     long start_recompute_time = System.nanoTime();
+        //                     // nleaf.node.recomputeBitmapsUp();
+        //                     // neighborLeaf.node.recomputeBitmapsUp();
+        //                     timeForRecompute += System.nanoTime() - start_recompute_time;
+        //                     return true;
+        //                     //promoteToWitness(new EdgeRecord(neighbor, depth, EndpointType.PRIMARY), depth);
+        //                     //mergeComponents(c_u.iterator().next(), c_v.iterator().next());
+        //                 }
+        //             }
+        //         }
+
+        //     }
+        // }
         if (depth <= 1) //no replacement at the root, so u_i and v_i become new roots
         //the roots just have the same thing twice, what
         {
@@ -789,8 +909,36 @@ public class HForest {
         }
         //no replacement at this level, so we split the components into their own HNodes at depth i-1, and recursively call deletion again with depth = depth - 1.
         HNode parent = u_i.parent;
-        
-        HNode parent_parent = parent.parent;
+        if (parent == null) {
+            // u_i is already a root despite depth > 1
+            // treat the same as the depth <= 1 case
+            u_i.isRoot = true;
+            this.roots.remove(u_i);
+            
+            HNode v_i = new HNode(n, depth);
+            v_i.isRoot = true;
+            v_i.weight = u_i.weight - c_u_weight;
+            u_i.weight = c_u_weight;
+            
+            v_i.children.addAll(c_v);
+            for (HNode node : c_v) {
+                node.parent = v_i;
+                node.isRoot = false;
+                if (node.leafData != null)
+                    leaves[node.leafData.vertex].parent = v_i;
+            }
+            
+            promoteWitnessEdges(u_i, depth);
+            v_i.recomputeBitmap();
+            u_i.recomputeBitmap();
+            v_i.parent = null;
+            u_i.parent = null;
+            this.roots.add(u_i);
+            this.roots.add(v_i);
+            return delete_edge_at_depth(u, v, depth - 1);
+        }
+
+        HNode parent_parent = parent.parent; // now safe
         parent.children.remove(u_i);
         u_i.depth = depth;
         HNode v_i = new HNode(n, depth);

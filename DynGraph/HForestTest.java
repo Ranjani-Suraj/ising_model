@@ -478,28 +478,31 @@ public class HForestTest {
         System.out.println("\n--- Suite 7: Stress Test ---");
 
         Random rng = new Random(42); // fixed seed for reproducibility
-        int n = 7500;
+        int n = 1000;
         int rounds = 1;
-        int opsPerRound = 100000;
+        int opsPerRound = 1000000;
         int num_deletions = 0, num_inserts = 0, num_connectivity_checks = 0;
         double total_time = 0.0;
         for (int round = 0; round < rounds; round++) {
             HForest hf = new HForest(n);
             HForest hf2 = new HForest(n);
             NaiveGraph ng = new NaiveGraph(n);
-            for(int i = 0; i<n; i++){
-                for(int j = i+1; j<n; j++){
-                    hf.add_edge(i, j);
-                    hf2.add_edge(i, j);
-                    //ng.insert(i, j);
-                }
-            }
+            // for(int i = 0; i<n; i++){
+            //     for(int j = i+1; j<n; j++){
+            //         hf.add_edge(i, j);
+            //         //hf2.add_edge(i, j);
+            //         //ng.insert(i, j);
+            //     }
+            // }
             System.out.println("Initial complete graph built with " + (n*(n-1))/2 + " edges");
             Set<String> currentEdges = new HashSet<>(); // track live edges
 
             for (int op = 0; op < opsPerRound; op++) {
                 boolean doInsert = currentEdges.isEmpty() || rng.nextBoolean();
-
+                // if(op == 449){
+                //     System.out.println("Before delete edge 0-1:");
+                //     //printForestState(hf);
+                // }
                 if (doInsert) {
                     int u = rng.nextInt(n);
                     int v = rng.nextInt(n);
@@ -509,6 +512,7 @@ public class HForestTest {
                     if (currentEdges.contains(key)) continue; // no multi-edges
                     double start_time = System.nanoTime();
                     hf.add_edge(u, v);
+                    hf2.add_edge(u, v);
                     double end_time = System.nanoTime();
                     total_time += (end_time - start_time);
                     ng.insert(u, v);
@@ -520,12 +524,12 @@ public class HForestTest {
                     int x = currentEdges.size(); // number of edges in the graph
                     num_connectivity_checks+= (x*(x-1))/2;
                     // printForestNodes(hf);
-                    if (op%1000 == 0) {
+                    if (op%100000 == 0) {
                         System.out.println("Completed stress round " + op + "/" + opsPerRound + 
                         " (avg time per op: " + (total_time / (op+1)) + " ns) + " + total_time + " ns so far "+total_time/1e9 + " seconds");
                         System.out.println("Delete time:" + hf.timeForDeleteEdge/1e6 +
                         "\n Add time:" + hf.timeForAddEdge/1e6 +" \n Connected time:" + hf.timeForConnected/1e6 + 
-                        "\n Recomute time:" + hf.timeForRecompute/1e6);
+                        "\n Recomute time:" + hf.timeForRecompute/1e6 + "num connected: "+hf.numconn);
                     }
                 } else {
                     // Pick a random existing edge to delete
@@ -536,7 +540,11 @@ public class HForestTest {
                     int v = Integer.parseInt(parts[1]);
 
                     double start_time = System.nanoTime();
+                    if(hf.isTreeEdge(u, v)){
+                    //    System.out.println("Deleting tree edge: " + u + "-" + v);
+                    }
                     hf.delete_edge(u, v);
+                    hf2.delete_edge(u, v);
                     double end_time = System.nanoTime();
                     total_time += (end_time - start_time);
                     ng.delete(u, v);
@@ -550,9 +558,8 @@ public class HForestTest {
 
                     // assertBitmapConsistency(hf, v, chosen, result);
                     // assertRootCount(hf, ng, chosen, result);
-                    //assertWitnessSymmetry(hf, u, v, op, chosen, result);
                     // printForestNodes(hf);
-                    if (op%1000 == 0) {
+                    if (op%100000 == 0) {
                         System.out.println("Completed stress round " + op + "/" + opsPerRound + 
                         " (avg time per op: " + (total_time / (op+1)) + " ns) + " + total_time + " ns so far "+total_time/1e9 + " seconds");
                         System.out.println("Operations so far: " + num_inserts + " inserts, " + num_deletions + " deletions"+ " and " + num_connectivity_checks + " connectivity checks");

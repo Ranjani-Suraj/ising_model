@@ -29,7 +29,7 @@ public class HNode {
     public int n = 0;
     //get induced (i, t) forest by taking the union of the paths from each leaf to the corresponding root
     //We do not need to store the entire forest explicitly, but we can store the parent-child relationships and the node types to reconstruct the forest when needed.
-    
+    public int primary_edge_count[]; // number of primary edges in the subtree rooted at this node
     final int D_MAX; // maximum degree of a node in the HForest, which is O(log n)
     //approximate counters
     // for each (i, primary)-leaf pair, we maintain the approximate number of (i, primary)-endpoints touching the leaf.
@@ -46,6 +46,7 @@ public class HNode {
     public HLeaf leafData; // only for leaf nodes, stores the isEndpoint bitmap and witness edges
     public boolean isRoot;
     public boolean[][] isEndpoint;
+    
 
     public HNode(int n, int depth) {
         this.n = n;
@@ -58,6 +59,14 @@ public class HNode {
         this.leafData = null;
         this.isEndpoint = new boolean[3][D_MAX + 1]; //3 types of endpoints, and we need to store whether this node is an endpoint for each possible depth up to D_MAX
         this.childBitCount = new int[3][D_MAX + 1];
+        this.primary_edge_count = new int[D_MAX + 1];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 1; j < D_MAX + 1; j++) {
+                isEndpoint[i][j] = false;
+                childBitCount[i][j] = 0;
+                primary_edge_count[j] = 0;
+            }
+        }
         //initialize all endpoints to false
         //means does this node have a primary/witness/secondary edge at depth i? This is the isEndpoint[i][j] field, where i is the type of endpoint and j is the depth
         for (int i = 0; i < 3; i++) {

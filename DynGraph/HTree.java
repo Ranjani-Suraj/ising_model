@@ -56,26 +56,26 @@ public class HTree {
         return nodeu;
     }
 
-    public static HNode merge(HNode u, HNode v){
-        //we merge them at level 0
+    // public static HNode merge(HNode u, HNode v){
+    //     //we merge them at level 0
         
-        HNode rootu = HNode.root(u);
-        HNode rootv = HNode.root(v);
-        if (rootu == rootv){
-            return null;
-        }
-        rootu.children.addAll(rootv.children);
-        //rootu.nodes_covered.addAll(rootv.nodes_covered);
-        rootu.edges_being_covered.putAll(rootv.edges_being_covered);
-        //need to update all the children of u and v that the new parent is u
-        HNode child;
-        for(int i = 0; i < rootv.children.size(); i++){
-            child = rootv.children.get(i);
-            child.parent = rootu;
-        }
+    //     HNode rootu = HNode.root(u);
+    //     HNode rootv = HNode.root(v);
+    //     if (rootu == rootv){
+    //         return null;
+    //     }
+    //     rootu.children.addAll(rootv.children);
+    //     //rootu.nodes_covered.addAll(rootv.nodes_covered);
+    //     rootu.edges_being_covered.putAll(rootv.edges_being_covered);
+    //     //need to update all the children of u and v that the new parent is u
+    //     HNode child;
+    //     for(int i = 0; i < rootv.children.size(); i++){
+    //         child = rootv.children.get(i);
+    //         child.parent = rootu;
+    //     }
         
-        return u;
-    }
+    //     return u;
+    // }
     
 
 }
